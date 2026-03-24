@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>proy_andres</name>
+  <version>0.0.0</version>
+  <description>Metapaquete principal del proyecto de Andres</description>
+  <maintainer email="andres@todo.todo">Andres</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>proy_andres_mundo</exec_depend>
+  <exec_depend>proy_andres_nav_punto</exec_depend>
+  <exec_depend>proy_andres_nav_ruta</exec_depend>
+  <exec_depend>proy_andres_captacion</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
