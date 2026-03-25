@@ -11,3 +11,19 @@ install(DIRECTORY
 )
 
 ament_package()
+
+# --- Añade esto para buscar los paquetes primero ---
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
+# Compilar el nodo de C++
+add_executable(control_manual src/control_manual.cpp)
+
+# Añadir las dependencias de ROS 2
+ament_target_dependencies(control_manual rclcpp geometry_msgs)
+
+# Instalar el ejecutable en la carpeta correcta
+install(TARGETS
+  control_manual
+  DESTINATION lib/${PROJECT_NAME}
+)

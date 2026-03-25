@@ -1,0 +1,27 @@
+cd ~/ProyectoRobotica04
+
+# Para compilar todo el espacio de trabajo:
+colcon build
+
+# Si quieres compilar SOLO tu paquete (más rápido):
+colcon build --packages-select proy_andres_mundo --allow-overriding proy_andres_mundo
+
+# Al principio en cada terminal
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+# 1. Limpiar variables conflictivas (Evita crasheos de la gráfica)
+unset LIBGL_ALWAYS_SOFTWARE
+unset GZ_SIM_RESOURCE_PATH
+
+# 2. Exportar rutas de modelos y texturas
+export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$PWD/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell/materials/textures:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell_bin/materials/textures
+
+# 3. Exportar modelo del robot
+export TURTLEBOT3_MODEL=burger
+
+# 4. Lanzar la simulación
+ros2 launch proy_andres_mundo warehouse.launch.py
+
+# Ejecutar tu script personalizado
+ros2 run proy_andres_mundo control_manual
