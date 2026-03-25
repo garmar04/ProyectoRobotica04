@@ -45,6 +45,38 @@
       <uri>model://workcell_bin</uri>
       <pose>2 2 0 0 0 0</pose>
     </include>
-    
+    <actor name="caja_movil">
+      <pose>2.0 2.0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.5 0.5 0.5</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Red</name>
+            </script>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.5 0.5 0.5</size></box>
+          </geometry>
+        </collision>
+      </link>
+      <script>
+        <loop>true</loop>
+        <delay_start>0.000000</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="square">
+           <waypoint><time>0.0</time><pose>-5.0 2.0 -0.25 0 0 0</pose></waypoint>
+           <waypoint><time>5.0</time><pose>-5.0 -2.0 -0.25 0 0 0</pose></waypoint>
+           <waypoint><time>10.0</time><pose>-5.0 2.0 -0.25 0 0 0</pose></waypoint>
+           <waypoint><time>15.0</time><pose>-2.0 2.0 -0.25 0 0 0</pose></waypoint>
+           <waypoint><time>20.0</time><pose>-5.0 2.0 -0.25 0 0 0</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>
   </world>
 </sdf>
