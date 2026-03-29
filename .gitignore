@@ -3,3 +3,6 @@
 build/
 install/
 log/
+# Paquetes de ROS 2 compilados desde la fuente
+src/slam_toolbox/
+src/navigation2/

@@ -27,8 +27,8 @@ class SmoothTeleop : public rclcpp::Node {
 public:
   SmoothTeleop() : Node("smooth_teleop") {
     // Parámetros de rendimiento
-    max_linear_ = 0.5;    
-    max_angular_ = 1.8;   
+    max_linear_ = 0.22;    
+    max_angular_ = 2.84;   
 
     accel_linear_ = 0.8;  
     accel_angular_ = 2.5; 
@@ -84,7 +84,7 @@ private:
 
   void controlLoop() {
     // Si no se pulsa nada en 0.4s, los objetivos van a cero (frenado suave)
-    if ((this->now() - last_key_time_).seconds() > 0.4) {
+    if ((this->now() - last_key_time_).seconds() > 0.6) {
       target_linear_ = 0.0;
       target_angular_ = 0.0;
     }

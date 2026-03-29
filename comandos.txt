@@ -1,27 +1,80 @@
-cd ~/ProyectoRobotica04
+### Instalación de dependencias (nada más clonar el repositorio) ###
 
-# Para compilar todo el espacio de trabajo:
+
+# Instalar automáticamente cualquier paquete de ROS 2 que el proyecto necesite y no esté en tu sistema
+cd ~/Escritorio/GTI/ProyectoRobotica04
+source /opt/ros/jazzy/setup.bash
+sudo rosdep init
+rosdep update
+rosdep install -i --from-path src --rosdistro jazzy -y
+
+# Compilar espacio de trabajo por primera vez
 colcon build
 
-# Si quieres compilar SOLO tu paquete (más rápido):
-colcon build --packages-select proy_andres_mundo --allow-overriding proy_andres_mundo
 
-# Al principio en cada terminal
+### Cada terminal nueva ###
+
+
+cd ~/Escritorio/GTI/ProyectoRobotica04
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
-# 1. Limpiar variables conflictivas (Evita crasheos de la gráfica)
-unset LIBGL_ALWAYS_SOFTWARE
-unset GZ_SIM_RESOURCE_PATH
+# Identificador de dominio (para que los nodos se vean entre sí)
+export ROS_DOMAIN_ID=0
+ROS_LOCALHOST_ONLY=0
 
-# 2. Exportar rutas de modelos y texturas
-export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$PWD/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell/materials/textures:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell_bin/materials/textures
-
-# 3. Exportar modelo del robot
+# Variables del robot
 export TURTLEBOT3_MODEL=burger
 
-# 4. Lanzar la simulación
-ros2 launch proy_andres_mundo warehouse.launch.py
+# Variables de rutas para Gazebo Moderno (Modelos y texturas)
+echo 'export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$PWD/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell/materials/textures:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell_bin/materials/textures' >> ~/.bashrc
 
-# Ejecutar tu script personalizado
+# Modo Compatibilidad Gráfica (Descomentar si Gazebo crashea al abrir):
+# echo 'export __GLX_VENDOR_LIBRARY_NAME=mesa' >> ~/.bashrc
+# echo 'export MESA_LOADER_DRIVER_OVERRIDE=zink' >> ~/.bashrc
+# echo 'export LIBGL_ALWAYS_SOFTWARE=1' >> ~/.bashrc
+
+# (Opcional) Si usas gráfica NVIDIA en tu portátil, usa estas variables en lugar de las de Mesa:
+# export __NV_PRIME_RENDER_OFFLOAD=1
+# export __GLX_VENDOR_LIBRARY_NAME=nvidia
+# export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+
+
+### Terminal de Gazebo ###
+
+
+# 1. (Opcional) Limpiar procesos fantasma si Gazebo se cerró mal en la sesión anterior
+pkill -9 gz; pkill -9 ruby; pkill -9 gazebo
+
+# 2. Compilar (Usa el select para que sea rápido, quita el select si has tocado otros paquetes)
+colcon build --packages-select proy_andres_mundo turtlebot3_gazebo --allow-overriding proy_andres_mundo turtlebot3_gazebo
+
+# 3. Refrescar los cambios recién compilados
+source install/setup.bash
+
+# 4. Lanzar la simulación (El argumento -r quita la pausa inicial)
+ros2 launch proy_andres_mundo warehouse.launch.py gz_args:="-r"
+
+
+### Terminal de control manual ###
+
+
+# Ejecutar el nodo de control manual
 ros2 run proy_andres_mundo control_manual
+
+
+### Terminal de SLAM y RViz ###
+
+
+# Lanzar el algoritmo SLAM de la caja de herramientas (usa el tiempo de simulación)
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
+
+# En otra pestaña o en segundo plano, abrir RViz para visualizar el mapa y el láser
+ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
+
+
+### Terminal Extra ###
+
+
+# Guardar el mapa (generará mapa_warehouse.yaml y mapa_warehouse.pgm en el directorio actual)
+ros2 run nav2_map_server map_saver_cli -f mapa_warehouse
