@@ -1,5 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <termios.h>
 #include <unistd.h>
 #include <thread>
@@ -37,7 +37,7 @@ public:
     current_linear_ = 0.0;
     current_angular_ = 0.0;
 
-    twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
+    twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
     timer_ = this->create_wall_timer(std::chrono::milliseconds(50), std::bind(&SmoothTeleop::controlLoop, this));
 
     last_key_time_ = this->now();
@@ -100,11 +100,9 @@ private:
     current_linear_ = smoothDato(current_linear_, target_linear_, accel_linear_ * dt);
     current_angular_ = smoothDato(current_angular_, target_angular_, accel_angular_ * dt);
 
-    geometry_msgs::msg::TwistStamped msg;
-    msg.header.stamp = this->get_clock()->now();
-    msg.header.frame_id = "base_link";
-    msg.twist.linear.x = current_linear_;
-    msg.twist.angular.z = current_angular_;
+    geometry_msgs::msg::Twist msg;
+    msg.linear.x = current_linear_;
+    msg.angular.z = current_angular_;
     twist_pub_->publish(msg);
   }
 
@@ -114,7 +112,7 @@ private:
     return current;
   }
 
-  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Time last_key_time_;
   std::thread key_thread_;

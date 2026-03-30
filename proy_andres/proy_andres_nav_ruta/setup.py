@@ -23,7 +23,8 @@ setup(
         ],
     },
     entry_points={
-        'console_scripts': [
+        'console_scripts':[
+            'patrullar = proy_andres_nav_ruta.patrullar:main'
         ],
     },
 )
