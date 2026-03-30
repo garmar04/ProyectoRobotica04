@@ -47,7 +47,7 @@ echo 'export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andr
 pkill -9 gz; pkill -9 ruby; pkill -9 gazebo
 
 # 2. Compilar (Usa el select para que sea rápido, quita el select si has tocado otros paquetes)
-colcon build --packages-select proy_andres_mundo turtlebot3_gazebo --allow-overriding proy_andres_mundo turtlebot3_gazebo
+colcon build --packages-select proy_andres_mundo turtlebot3_gazebo
 
 # 3. Refrescar los cambios recién compilados
 source install/setup.bash
