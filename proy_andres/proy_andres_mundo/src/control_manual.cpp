@@ -26,12 +26,11 @@ void restoreKeyboard() {
 class SmoothTeleop : public rclcpp::Node {
 public:
   SmoothTeleop() : Node("smooth_teleop") {
-    // Parámetros de rendimiento
-    max_linear_ = 0.22;    
-    max_angular_ = 2.84;   
+    max_linear_ = 1.22;
+    max_angular_ = 0.6;
 
-    accel_linear_ = 0.8;  
-    accel_angular_ = 2.5; 
+    accel_linear_ = 0.5;
+    accel_angular_ = 1.5;
 
     target_linear_ = 0.0;
     target_angular_ = 0.0;
@@ -48,6 +47,7 @@ public:
     puts("Reading from keyboard (COMBO DRIVE MODE)");
     puts("-----------------------------------------");
     puts("W/S: Forward/Back | A/D: Turn Left/Right");
+    puts("Espacio: Freno de emergencia");
     puts("Press 'q' to quit.");
   }
 
@@ -75,6 +75,12 @@ private:
           case 'd': case 'D': 
             target_angular_ = -max_angular_; 
             break;
+          case ' ': // NUEVO: Freno inmediato
+            target_linear_ = 0.0;
+            target_angular_ = 0.0;
+            current_linear_ = 0.0; 
+            current_angular_ = 0.0;
+            break;
           case 'q': case 'Q': 
             restoreKeyboard(); rclcpp::shutdown(); exit(0); break;
         }
@@ -83,15 +89,14 @@ private:
   }
 
   void controlLoop() {
-    // Si no se pulsa nada en 0.4s, los objetivos van a cero (frenado suave)
-    if ((this->now() - last_key_time_).seconds() > 0.6) {
+    // CORRECCIÓN 2: Reducido el delay de 0.6s a 0.15s para que frene rápido al soltar
+    if ((this->now() - last_key_time_).seconds() > 0.15) {
       target_linear_ = 0.0;
       target_angular_ = 0.0;
     }
 
     double dt = 0.05; 
     
-    // Aplicamos rampas suaves a ambos ejes de forma independiente
     current_linear_ = smoothDato(current_linear_, target_linear_, accel_linear_ * dt);
     current_angular_ = smoothDato(current_angular_, target_angular_, accel_angular_ * dt);
 
