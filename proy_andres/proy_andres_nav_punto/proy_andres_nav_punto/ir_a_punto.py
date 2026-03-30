@@ -16,11 +16,10 @@ def main(args=None):
     # Definimos el punto de destino
     goal_pose = PoseStamped()
     goal_pose.header.frame_id = 'map'
-    goal_pose.header.stamp = navigator.get_clock().now().to_msg()
     
     # Coordenadas X e Y (ajusta estos valores según tu mapa de Gazebo)
-    goal_pose.pose.position.x = 2.0
-    goal_pose.pose.position.y = 1.5
+    goal_pose.pose.position.x = 8.5
+    goal_pose.pose.position.y = -8.0
     # Orientación (cuaternión). w=1.0 significa mirando hacia adelante sin rotación extra
     goal_pose.pose.orientation.w = 1.0
 
@@ -42,7 +41,6 @@ def main(args=None):
     elif result == TaskResult.FAILED:
         print('El robot falló al intentar llegar al destino (¿obstáculo insalvable?).')
 
-    navigator.lifecycleShutdown()
     rclpy.shutdown()
 
 if __name__ == '__main__':

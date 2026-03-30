@@ -78,3 +78,16 @@ ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
 
 # Guardar el mapa (generará mapa_warehouse.yaml y mapa_warehouse.pgm en el directorio actual)
 ros2 run nav2_map_server map_saver_cli -f mapa_warehouse
+
+
+### Lanzar Nav2 ###
+
+
+# Usamos la ruta del archivo .yaml del mapa generado
+ros2 launch nav2_bringup bringup_launch.py use_sim_time:=true map:=/home/javier/Escritorio/GTI/ProyectoRobotica04/mapa_warehouse.yaml
+
+# Navegación automática: Modo patrulla
+ros2 run proy_andres_nav_ruta patrullar --ros-args -p use_sim_time:=true
+
+# Navegación automática: Modo coordenada
+ros2 run proy_andres_nav_punto ir_a_punto --ros-args -p use_sim_time:=true
