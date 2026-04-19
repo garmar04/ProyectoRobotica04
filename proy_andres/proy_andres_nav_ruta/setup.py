@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts':[
-            'patrullar = proy_andres_nav_ruta.patrullar:main'
+            'patrullar = proy_andres_nav_ruta.patrullar:main',
+            'patrulla_bridge = proy_andres_nav_ruta.patrulla_bridge:main'
         ],
     },
 )

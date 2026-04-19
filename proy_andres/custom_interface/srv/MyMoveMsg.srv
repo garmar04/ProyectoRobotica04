@@ -1,0 +1,4 @@
+# custom_interface/srv/MyMoveMsg.srv
+string move
+---
+bool success
