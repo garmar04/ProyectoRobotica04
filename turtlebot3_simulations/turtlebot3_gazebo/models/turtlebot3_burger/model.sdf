@@ -49,6 +49,7 @@
         <always_on>true</always_on>
         <update_rate>200</update_rate>
         <topic>imu</topic>
+        <gz:frame_id xmlns:gz="http://gazebosim.org/schema">imu_link</gz:frame_id>
         <imu>
           <angular_velocity>
             <x>
@@ -98,26 +99,11 @@
       <inertial>
         <pose>-0.020 0 0.161 0 0 0</pose>
         <inertia>
-          <ixx>0.0001</ixx>
-          <ixy>0.000</ixy>
-          <ixz>0.000</ixz>
-          <iyy>0.0001</iyy>
-          <iyz>0.000</iyz>
-          <izz>0.0001</izz>
+          <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0001</iyy><iyz>0</iyz><izz>0.0001</izz>
         </inertia>
         <mass>0.114</mass>
       </inertial>
-
-      <collision name="lidar_sensor_collision">
-        <pose>-0.020 0 0.161 0 0 0</pose>
-        <geometry>
-          <cylinder>
-            <radius>0.0508</radius>
-            <length>0.055</length>
-          </cylinder>
-        </geometry>
-      </collision>
-
       <visual name="lidar_sensor_visual">
         <pose>-0.032 0 0.171 0 0 0</pose>
         <geometry>
@@ -126,19 +112,16 @@
             <scale>0.001 0.001 0.001</scale>
           </mesh>
         </geometry>
-        <material>
-          <ambient>0.2 0.2 0.2 1.0</ambient>
-          <diffuse>0.2 0.2 0.2 1.0</diffuse>
-        </material>
       </visual>
 
       <sensor name="hls_lfcd_lds" type="gpu_lidar">
         <always_on>true</always_on>
         <visualize>true</visualize>
-        <pose>-0.032 0 0.171 0 0 0</pose>
         <update_rate>5</update_rate>
+        <pose>-0.032 0 0.171 0 0 0</pose>   <!-- offset relativo al link -->
         <topic>scan</topic>
-        <gz_frame_id>base_scan</gz_frame_id>
+        <gz:frame_id xmlns:gz="http://gazebosim.org/schema">base_scan</gz:frame_id>
+
         <lidar>
           <scan>
             <horizontal>
@@ -149,9 +132,9 @@
             </horizontal>
           </scan>
           <range>
-            <min>0.120000</min>
+            <min>0.12</min>
             <max>3.5</max>
-            <resolution>0.015000</resolution>
+            <resolution>0.015</resolution>
           </range>
           <noise>
             <type>gaussian</type>

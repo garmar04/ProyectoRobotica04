@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Robot de Vigilancia - Fábrica</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sistema de Control - Robot de Vigilancia</h1>
+            <div class="status-bar">
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Desconectado</span>
+                </div>
+                <div class="timestamp" id="currentTime"></div>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <!-- 1. Conexión y Estado -->
+            <section class="panel connection-panel">
+                <h2>Conexión ROS2</h2>
+                <div class="connection-controls">
+                    <div class="input-group">
+                        <label for="websocketUrl">URL WebSocket:</label>
+                        <input
+                            type="text"
+                            id="websocketUrl"
+                            value="ws://127.0.0.1:9090/"
+                            placeholder="ws://127.0.0.1:9090/"
+                        >
+                    </div>
+                    <div class="button-group">
+                        <button id="connectBtn" class="btn btn-primary">Conectar</button>
+                        <button id="disconnectBtn" class="btn btn-secondary" disabled>Desconectar</button>
+                    </div>
+                </div>
+                <div class="connection-info">
+                    <div class="info-item">
+                        <span class="label">Estado:</span>
+                        <span id="connectionStatus" class="value">Desconectado</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Último evento:</span>
+                        <span id="lastEvent" class="value">-</span>
+                    </div>
+                </div>
+            </section>
+            <!-- 4. Recepción de Alertas -->
+            <section class="panel alerts-panel">
+                <h2>Alertas de Seguridad</h2>
+                <div class="alerts-controls">
+                    <button id="clearAlertsBtn" class="btn btn-small">Limpiar Alertas</button>
+                    <span class="alerts-count">Total: <span id="alertsCount">0</span></span>
+                </div>
+                <div id="alertsList" class="alerts-list">
+                    <div class="alerts-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <p>No hay alertas</p>
+                    </div>
+                </div>
+            </section>
+            <!-- 2. Visualización del Entorno -->
+            <section class="panel visualization-panel">
+                <h2>Visualización del Entorno</h2>
+                <div class="visualization-grid">
+                    <div class="viewer-container">
+                        <h3>Cámara del Robot</h3>
+                        <div id="cameraViewer" class="viewer">
+                            <div class="viewer-placeholder">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                </svg>
+                                <p>Esperando stream de cámara</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="viewer-container">
+                        <h3>Mapa de Navegación</h3>
+                        <div id="mapViewer" class="viewer">
+                            <div class="viewer-placeholder">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                                    <line x1="8" y1="2" x2="8" y2="18"/>
+                                    <line x1="16" y1="6" x2="16" y2="22"/>
+                                </svg>
+                                <p>Esperando mapa</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- 3. Modo de Operación -->
+            <section class="panel mode-panel">
+                <h2>Modo de Operación</h2>
+                <div class="mode-selection-container">
+                    <span class="mode-label">Manual</span>
+                    <label class="switch">
+                        <input type="checkbox" id="modeToggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="mode-label">Automático</span>
+                </div>
+                <div class="mode-description">
+                    <p id="modeStatusDesc">El robot está bajo control manual del usuario.</p>
+                </div>
+                <div class="mode-indicator">
+                    <span class="label">Estado actual:</span>
+                    <span id="currentModeText" class="value mode-manual">Modo Manual</span>
+                </div>
+            </section>
+
+            <!-- 4. Control del Robot -->
+            <section class="panel control-panel">
+                <h2>Control de Movimiento</h2>
+                <div class="control-grid">
+                    <div class="movement-controls">
+                        <div class="control-row">
+                            <button class="btn-control" id="btnForward" data-direction="forward">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="18 15 12 9 6 15"/>
+                                </svg>
+                                <span>Adelante</span>
+                            </button>
+                        </div>
+                        <div class="control-row">
+                            <button class="btn-control" id="btnLeft" data-direction="left">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"/>
+                                </svg>
+                                <span>Izquierda</span>
+                            </button>
+                            <button class="btn-control btn-stop" id="btnStop" data-direction="stop">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="6" y="6" width="12" height="12"/>
+                                </svg>
+                                <span>Parar</span>
+                            </button>
+                            <button class="btn-control" id="btnRight" data-direction="right">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                                <span>Derecha</span>
+                            </button>
+                        </div>
+                        <div class="control-row">
+                            <button class="btn-control" id="btnBackward" data-direction="backward">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                                <span>Atrás</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="control-status">
+                        <div class="status-item">
+                            <span class="label">Último comando:</span>
+                            <span id="lastCommand" class="value">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Estado servicio:</span>
+                            <span id="serviceStatus" class="value">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Sistema de Vigilancia Robótica v1.0 | ROS2 WebSocket Interface</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

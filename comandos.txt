@@ -1,5 +1,10 @@
 ### Instalación de dependencias (nada más clonar el repositorio) ###
 
+# Si estás en ArchLinux:
+
+distrobox enter ros_jazzy
+bash
+conda deactivate
 
 # Instalar automáticamente cualquier paquete de ROS 2 que el proyecto necesite y no esté en tu sistema
 cd ~/Escritorio/GTI/ProyectoRobotica04

@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts':[
-            'ir_a_punto = proy_andres_nav_punto.ir_a_punto:main'
+            'ir_a_punto = proy_andres_nav_punto.ir_a_punto:main',
+            'web_teleop = proy_andres_nav_punto.web_teleop_service:main'
         ],
     },
 )
