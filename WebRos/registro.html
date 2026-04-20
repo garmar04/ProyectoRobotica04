@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VELARIS — Crear Cuenta</title>
+  <link rel="stylesheet" href="velaris.css">
+  <style>
+    .auth-card {
+      max-width: 520px;
+      animation: fade-up 0.4s ease;
+    }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      transition: color 0.2s;
+    }
+    .password-toggle:hover { color: var(--light); }
+
+    .strength-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .strength-fill {
+      height: 100%;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s, background 0.3s;
+    }
+    .strength-label { font-size: 11px; color: var(--tech); margin-top: 4px; }
+
+    .grid-name { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .terms-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .terms-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      flex-shrink: 0;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .terms-row a { color: var(--primary); text-decoration: none; }
+    .terms-row a:hover { text-decoration: underline; }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+    }
+    .btn-submit .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .btn-submit.loading .btn-text { display: none; }
+    .btn-submit.loading .spinner  { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .alert-success {
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #6ee7b7;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .alert-success.visible { display: block; }
+
+    .role-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .role-option { position: relative; }
+    .role-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .role-option label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .role-option input:checked + label {
+      border-color: var(--primary);
+      color: var(--light);
+      background: rgba(57,136,219,0.08);
+    }
+    .role-option label svg { color: var(--tech); flex-shrink: 0; transition: color 0.2s; }
+    .role-option input:checked + label svg { color: var(--primary); }
+
+    .brand-ring {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid rgba(57,136,219,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      background: rgba(57,136,219,0.06);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-layout">
+    <div class="auth-card">
+
+      <div class="auth-logo">
+        <div class="brand-ring">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <h1>VELARIS</h1>
+        <p>CREAR CUENTA DE OPERADOR</p>
+      </div>
+
+      <div class="alert-success" id="alertSuccess">
+        Cuenta creada correctamente. Redirigiendo al panel de control...
+      </div>
+
+      <form id="registerForm" novalidate>
+
+        <div class="grid-name">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="firstName">Nombre</label>
+            <input type="text" id="firstName" name="firstName" placeholder="Ana" required>
+            <span class="form-error" id="firstNameError">Campo obligatorio.</span>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="lastName">Apellido</label>
+            <input type="text" id="lastName" name="lastName" placeholder="García" required>
+            <span class="form-error" id="lastNameError">Campo obligatorio.</span>
+          </div>
+        </div>
+        <div style="margin-bottom:18px;"></div>
+
+        <div class="form-group">
+          <label for="email">Correo electrónico</label>
+          <div class="input-icon-wrap">
+            <span class="icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </span>
+            <input type="email" id="email" name="email" placeholder="operador@empresa.com" required>
+          </div>
+          <span class="form-error" id="emailError">Introduce un correo válido.</span>
+        </div>
+
+        <div class="form-group">
+          <label>Rol</label>
+          <div class="role-selector">
+            <div class="role-option">
+              <input type="radio" id="roleOperator" name="role" value="operator" checked>
+              <label for="roleOperator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                Operador
+              </label>
+            </div>
+            <div class="role-option">
+              <input type="radio" id="roleAdmin" name="role" value="admin">
+              <label for="roleAdmin">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                Administrador
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <div class="input-icon-wrap" style="position:relative;">
+            <span class="icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Mínimo 8 caracteres"
+              required
+              style="padding-right:44px;"
+            >
+            <button type="button" class="password-toggle" id="togglePw1" aria-label="Mostrar contraseña">
+              <svg id="eyeIcon1" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+          <div class="strength-label" id="strengthLabel">Escribe tu contraseña</div>
+          <span class="form-error" id="passwordError">Mínimo 8 caracteres.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">Confirmar contraseña</label>
+          <div class="input-icon-wrap" style="position:relative;">
+            <span class="icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              placeholder="Repite la contraseña"
+              required
+              style="padding-right:44px;"
+            >
+            <button type="button" class="password-toggle" id="togglePw2" aria-label="Mostrar contraseña">
+              <svg id="eyeIcon2" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <span class="form-error" id="confirmError">Las contraseñas no coinciden.</span>
+        </div>
+
+        <div class="terms-row">
+          <input type="checkbox" id="terms" name="terms" required>
+          <label for="terms">
+            Acepto los <a href="#">Términos de Uso</a> y la
+            <a href="#">Política de Privacidad</a> de VELARIS.
+          </label>
+        </div>
+        <span class="form-error" id="termsError" style="margin-top:-18px;margin-bottom:16px;display:none;">Debes aceptar los términos.</span>
+
+        <button type="submit" class="btn btn-primary btn-submit" id="submitBtn">
+          <span class="btn-text">Crear Cuenta</span>
+          <span class="spinner"></span>
+        </button>
+      </form>
+
+      <div class="auth-divider">o</div>
+
+      <div class="auth-footer">
+        ¿Ya tienes cuenta? <a href="login.html">Iniciar sesión</a>
+      </div>
+      <div class="auth-footer" style="margin-top:12px;">
+        <a href="landing.html" style="color:var(--muted);font-size:12px;">← Volver al inicio</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Password visibility toggles */
+    function makeToggle(btnId, inputId, iconId) {
+      document.getElementById(btnId).addEventListener('click', () => {
+        const inp = document.getElementById(inputId);
+        const ico = document.getElementById(iconId);
+        const isText = inp.type === 'text';
+        inp.type = isText ? 'password' : 'text';
+        ico.innerHTML = isText
+          ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+          : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+      });
+    }
+    makeToggle('togglePw1', 'password', 'eyeIcon1');
+    makeToggle('togglePw2', 'confirmPassword', 'eyeIcon2');
+
+    /* Password strength */
+    const pwInput = document.getElementById('password');
+    const fill    = document.getElementById('strengthFill');
+    const label   = document.getElementById('strengthLabel');
+
+    pwInput.addEventListener('input', () => {
+      const v = pwInput.value;
+      let score = 0;
+      if (v.length >= 8)  score++;
+      if (/[A-Z]/.test(v)) score++;
+      if (/[0-9]/.test(v)) score++;
+      if (/[^A-Za-z0-9]/.test(v)) score++;
+
+      const map = [
+        { w: '0%',   bg: 'transparent', text: 'Escribe tu contraseña' },
+        { w: '25%',  bg: '#EF4444',     text: 'Muy débil' },
+        { w: '50%',  bg: '#F59E0B',     text: 'Débil' },
+        { w: '75%',  bg: '#3988DB',     text: 'Buena' },
+        { w: '100%', bg: '#10B981',     text: 'Excelente' },
+      ];
+      const s = v.length === 0 ? 0 : Math.min(score, 4);
+      fill.style.width      = map[s].w;
+      fill.style.background = map[s].bg;
+      label.textContent     = map[s].text;
+      label.style.color     = map[s].bg === 'transparent' ? 'var(--tech)' : map[s].bg;
+    });
+
+    /* Form validation & submit */
+    const form = document.getElementById('registerForm');
+
+    function showError(id, show) {
+      const el = document.getElementById(id);
+      el.style.display = show ? 'block' : 'none';
+    }
+
+    function validateEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      /* Clear errors */
+      ['firstNameError','lastNameError','emailError','passwordError','confirmError','termsError'].forEach(id => showError(id, false));
+
+      let valid = true;
+      if (!document.getElementById('firstName').value.trim()) { showError('firstNameError', true); valid = false; }
+      if (!document.getElementById('lastName').value.trim())  { showError('lastNameError', true);  valid = false; }
+      if (!validateEmail(document.getElementById('email').value.trim())) { showError('emailError', true); valid = false; }
+      if (pwInput.value.length < 8) { showError('passwordError', true); valid = false; }
+      if (document.getElementById('confirmPassword').value !== pwInput.value) { showError('confirmError', true); valid = false; }
+      if (!document.getElementById('terms').checked) { showError('termsError', true); valid = false; }
+
+      if (!valid) return;
+
+      const btn = document.getElementById('submitBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      await new Promise(r => setTimeout(r, 1000));
+
+      btn.classList.remove('loading');
+      document.getElementById('alertSuccess').classList.add('visible');
+
+      await new Promise(r => setTimeout(r, 1200));
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>

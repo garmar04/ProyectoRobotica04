@@ -14,8 +14,8 @@
     --bg-color: #0f172a;
     --panel-bg: #1e293b;
     --panel-border: #334155;
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
     --input-bg: #0f172a;
     --input-border: #475569;
 }
@@ -33,22 +33,100 @@ body {
     padding: 20px;
 }
 
-header {
+.top-nav {
     background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 24px;
+    border-bottom: 1px solid var(--panel-border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-header h1 {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 16px;
+.brand-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.brand {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
     background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+.system-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-indicator-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: 24px;
+}
+
+.conn-badge {
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.timestamp-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.header-nav {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-nav:hover {
+    background: var(--panel-border);
+    transform: translateY(-1px);
+}
+
+.btn-logout:hover {
+    background: #7f1d1d;
+    border-color: #ef4444;
+}
+
+.top-nav-left {
+    display: flex;
+    align-items: center;
 }
 
 .status-bar {
