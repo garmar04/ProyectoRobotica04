@@ -25,7 +25,8 @@ echo "📦 Cargando entorno ROS 2 Jazzy..."
 source /opt/ros/jazzy/setup.bash
 source $WORKSPACE_DIR/install/setup.bash
 
-export ROS_DOMAIN_ID=0
+export ROS_DOMAIN_ID=42
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
 export ROS_LOCALHOST_ONLY=0
 export TURTLEBOT3_MODEL=burger
 export GZ_SIM_RESOURCE_PATH=$WORKSPACE_DIR/install/proy_andres_mundo/share/proy_andres_mundo/models:$WORKSPACE_DIR/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$WORKSPACE_DIR/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models
@@ -48,7 +49,7 @@ ros2 launch nav2_bringup bringup_launch.py use_sim_time:=true map:=$WORKSPACE_DI
 NAV_PID=$!
 
 # Publicar Pose Inicial automáticamente después de un pequeño retraso
-(sleep 5; ros2 topic pub -1 /initialpose geometry_msgs/msg/PoseWithCovarianceStamped '{header: {frame_id: "map"}, pose: {pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}}}') &
+(sleep 5; python3 $WORKSPACE_DIR/scripts/publish_initialpose.py) &
 POSE_PID=$!
 
 sleep 15

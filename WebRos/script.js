@@ -27,7 +27,7 @@ const ACCEL_LIN = 0.4;
 const ACCEL_ANG = 1.0;
 const DT = 0.05;
 
-/* ── DOM refs ───────────────────────────────────────────── */
+/* ── DOM refs (con protección) ───────────────────────────────── */
 const el = {
   websocketUrl: document.getElementById('websocketUrl'),
   connectBtn: document.getElementById('connectBtn'),
@@ -54,22 +54,26 @@ const el = {
   currentModeText: document.getElementById('currentModeText'),
 };
 
+function safeSetText(el, text) {
+  if (el && el.textContent !== undefined) el.textContent = text;
+}
+
 /* ── Clock ──────────────────────────────────────────────── */
 function updateTime() {
-  el.currentTime.textContent = new Date().toLocaleTimeString('es-ES', {
+  safeSetText(el.currentTime, new Date().toLocaleTimeString('es-ES', {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
-  });
+  }));
 }
 setInterval(updateTime, 1000);
 updateTime();
 
 /* ── Connection status ──────────────────────────────────── */
 function setConnectionStatus(label, eventLabel) {
-  el.connectionStatus.textContent = label;
-  el.statusText.textContent = label;
+  safeSetText(el.connectionStatus, label);
+  safeSetText(el.statusText, label);
 
   if (eventLabel) {
-    el.lastEvent.textContent = `${eventLabel} — ${new Date().toLocaleTimeString('es-ES')}`;
+    safeSetText(el.lastEvent, `${eventLabel} — ${new Date().toLocaleTimeString('es-ES')}`);
   }
 
   el.statusDot.className = 'status-dot';
@@ -104,7 +108,7 @@ function addAlert(message, severity) {
 
   el.alertsList.insertBefore(item, el.alertsList.firstChild);
   alertItemCount++;
-  el.alertsCount.textContent = alertItemCount;
+  safeSetText(el.alertsCount, alertItemCount);
 }
 
 function clearAlerts() {
@@ -114,7 +118,7 @@ function clearAlerts() {
     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
     '</svg><p>Sin alertas activas</p></div>';
   alertItemCount = 0;
-  el.alertsCount.textContent = 0;
+  safeSetText(el.alertsCount, 0);
 }
 
 /* ── ROS Connection ─────────────────────────────────────── */
@@ -127,7 +131,7 @@ function connectToROS() {
     setConnectionStatus('Conectado', 'Conexión establecida');
     el.connectBtn.disabled = true;
     el.disconnectBtn.disabled = false;
-    el.svcStatusText.textContent = 'ROS2 conectado. Inicializando tópicos...';
+    safeSetText(el.svcStatusText, 'ROS2 conectado. Inicializando tópicos...');
 
     cmdVelTopic = new ROSLIB.Topic({
       ros: ros, name: '/cmd_vel', messageType: 'geometry_msgs/msg/Twist'
@@ -142,63 +146,194 @@ function connectToROS() {
       addAlert(text, sev);
     });
 
-    //Subscribe to the map topic
     var canvasMap = document.getElementById("map");
-    mapTopic = new ROSLIB.Topic({
-      ros: ros,
-      name: '/map',
-      messageType: 'nav_msgs/msg/OccupancyGrid'
-    });
 
-    mapTopic.subscribe((message) => {
-      var placeholder = document.getElementById('mapPlaceholder');
-      if (placeholder) placeholder.style.display = 'none';
-      if (canvasMap) canvasMap.style.display = 'block';
-      currentMapData = message;
-      draw_occupancy_grid(canvasMap, currentMapData, currentRobotPos);
-    });
+    // 1. Crear el Viewer primero para que el stage exista antes de añadir el marcador
+    if (!window.mapViewer) {
+      window.mapViewer = new ROS2D.Viewer({
+        divID: 'mapViewer',
+        width: 600,
+        height: 400,
+        background: '#f0f0f0'
+      });
+    }
 
-    // Subscribe to the /odom topic for robot position
+    // Resolver el EaselJS Stage sea cual sea la propiedad que use esta versión de ros2d.
+    // ros2d@0.10.0 puede exponerlo como .scene, .stage, o no exponerlo directamente;
+    // en ese último caso lo recuperamos del canvas que ros2d inserta en el div.
+    if (!window.mapScene) {
+      var resolvedScene = window.mapViewer.scene || window.mapViewer.stage || null;
+      if (!resolvedScene) {
+        var ros2dCanvas = document.querySelector('#mapViewer canvas:not(#map)');
+        if (ros2dCanvas) {
+          resolvedScene = new createjs.Stage(ros2dCanvas);
+        }
+      }
+      window.mapScene = resolvedScene;
+    }
+
+    if (!window.mapScene) {
+      console.error('No se pudo resolver el EaselJS Stage de ros2d. El marcador no se mostrara.');
+    }
+
+    // 2. Crear el marcador gráfico (una flecha verde) y añadirlo al stage
+    window.robotMarker = new ROS2D.NavigationArrow({
+      size: 0.35,
+      strokeSize: 0.1,
+      fillColor: createjs.Graphics.getRGB(0, 255, 0, 0.8),
+      pulse: false
+    });
+    window.robotMarker.visible = false;
+
+    if (window.mapScene) {
+      window.mapScene.addChild(window.robotMarker);
+    }
+
+    // 3. Suscribirse a la Odometría (/odom)
     odomTopic = new ROSLIB.Topic({
       ros: ros,
       name: '/odom',
       messageType: 'nav_msgs/msg/Odometry'
     });
 
-    odomTopic.subscribe((message) => {
-      currentRobotPos.x = message.pose.pose.position.x;
-      currentRobotPos.y = message.pose.pose.position.y;
-      if (currentMapData && canvasMap) {
-        draw_occupancy_grid(canvasMap, currentMapData, currentRobotPos);
+    odomTopic.subscribe(function (msg) {
+      var pose = msg.pose.pose.position;
+      var orientation = msg.pose.pose.orientation;
+
+      // Calcular yaw desde el quaternion
+      var siny_cosp = 2 * (orientation.w * orientation.z + orientation.x * orientation.y);
+      var cosy_cosp = 1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z);
+      var theta = Math.atan2(siny_cosp, cosy_cosp);
+
+      currentRobotPos.x = pose.x;
+      currentRobotPos.y = pose.y;
+      currentRobotPos.theta = theta;
+
+      // Actualizar el marcador en el canvas del mapa usando el ImageData cacheado.
+      // El mapa ya fue volteado verticalmente al cachearlo, asi que la formula
+      // de coordenadas es la estandar ROS->canvas (Y invertido respecto al mundo ROS).
+      var fallbackCanvas = document.getElementById('map');
+      if (fallbackCanvas && window.mapImageData && window.lastMapMsg) {
+        try {
+          var info   = window.lastMapMsg.info;
+          var ctx    = fallbackCanvas.getContext('2d');
+          var origin = info.origin.position;
+          var res    = info.resolution;
+          var mapH   = info.height;
+
+          // 1. Restaurar la imagen del mapa sin marcador
+          ctx.putImageData(window.mapImageData, 0, 0);
+
+          // 2. Convertir coordenadas ROS (metros) -> pixeles del canvas corregido.
+          //    Como el ImageData fue volteado verticalmente, el eje Y ya es correcto:
+          //    Y ROS crece hacia arriba, canvas crece hacia abajo -> inversion estandar.
+          var px = (pose.x - origin.x) / res;
+          var py = mapH - (pose.y - origin.y) / res;
+
+          // 3. Dibujar el circulo verde del robot
+          ctx.beginPath();
+          ctx.fillStyle = 'green';
+          ctx.arc(px, py, 5, 0, 2 * Math.PI);
+          ctx.fill();
+        } catch (err) {
+          console.error('Error actualizando marcador del robot:', err);
+        }
       }
     });
 
-    var initialPoseTopic = new ROSLIB.Topic({
-      ros: ros, name: '/initialpose',
-      messageType: 'geometry_msgs/msg/PoseWithCovarianceStamped'
+    var gridClient = new ROS2D.OccupancyGridClient({
+      ros: ros,
+      rootObject: window.mapScene || window.mapViewer.scene,
+      continuous: true
     });
 
-    setTimeout(function () {
-      var poseMsg = new ROSLIB.Message({
-        header: { frame_id: 'map', stamp: { sec: 0, nanosec: 0 } },
-        pose: {
-          pose: {
-            position: { x: 0.0, y: 0.0, z: 0.0 },
-            orientation: { w: 1.0, x: 0.0, y: 0.0, z: 0.0 }
-          },
-          covariance: [
-            0.25, 0, 0, 0, 0, 0,
-            0, 0.25, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0.068
-          ]
-        }
+    // Exponer cliente y ocultar placeholder cuando llegue el mapa
+    try {
+      window.gridClient = gridClient;
+      gridClient.on('change', function () {
+        console.log('OccupancyGridClient: mapa recibido', gridClient.currentGrid);
+        var ph = document.getElementById('mapPlaceholder');
+        if (ph) ph.style.display = 'none';
+        var cvViewer = document.querySelector('#mapViewer canvas');
+        if (cvViewer) cvViewer.style.display = 'block';
+        if (canvasMap) canvasMap.style.display = 'none';
       });
-      initialPoseTopic.publish(poseMsg);
-      addAlert('Pose inicial enviada. Nav2 activado.', 'info');
-      el.svcStatusText.textContent = 'Nav2 activado. Sistema listo.';
+    } catch (e) {
+      console.warn('No se pudo registrar change handler en gridClient', e);
+    }
+
+    // Fallback: suscribirse manualmente a /map (prueba ROS2 y ROS1 naming)
+    (function trySubscribeMap(typeIndex) {
+      var types = ['nav_msgs/msg/OccupancyGrid', 'nav_msgs/OccupancyGrid'];
+      var type = types[typeIndex] || types[0];
+      try {
+        var mapSub = new ROSLIB.Topic({ ros: ros, name: '/map', messageType: type, compression: 'png' });
+        mapSub.subscribe(function (msg) {
+          try {
+            console.log('Fallback /map message received (type=' + type + ')', msg);
+            window.lastMapMsg = msg;
+            var canvas = document.getElementById('map');
+            if (canvas) {
+              canvas.style.display = 'block';
+              var ph = document.getElementById('mapPlaceholder');
+              if (ph) ph.style.display = 'none';
+              try {
+                // 1. Dibujar el mapa SIN robot. draw_occupancy_grid coloca data[0]
+                //    (esquina inferior-izquierda en ROS) en canvas (0,0) = esquina
+                //    superior-izquierda, por lo que el mapa queda invertido en Y.
+                draw_occupancy_grid(canvas, msg, null);
+                var ctx = canvas.getContext('2d');
+
+                // 2. Voltear el ImageData verticalmente para corregir la orientacion.
+                //    Asi el norte del mapa queda arriba y las coordenadas ROS->canvas
+                //    siguen la conversion estandar (Y_canvas = mapH - Y_ros/res).
+                var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                var w = imgData.width, h = imgData.height;
+                var rowBytes = w * 4;
+                var tmp = new Uint8ClampedArray(rowBytes);
+                var d = imgData.data;
+                for (var row = 0; row < Math.floor(h / 2); row++) {
+                  var top    = row * rowBytes;
+                  var bottom = (h - 1 - row) * rowBytes;
+                  tmp.set(d.subarray(top, top + rowBytes));
+                  d.copyWithin(top, bottom, bottom + rowBytes);
+                  d.set(tmp, bottom);
+                }
+                ctx.putImageData(imgData, 0, 0);
+
+                // 3. Guardar el mapa volteado como cache (sin robot)
+                window.mapImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                // 4. Dibujar el robot encima si ya tenemos posicion
+                if (currentRobotPos.x !== 0 || currentRobotPos.y !== 0) {
+                  var info   = msg.info;
+                  var origin = info.origin.position;
+                  var res    = info.resolution;
+                  var mapH   = info.height;
+                  var px = (currentRobotPos.x - origin.x) / res;
+                  var py = mapH - (currentRobotPos.y - origin.y) / res;
+                  ctx.beginPath();
+                  ctx.fillStyle = 'green';
+                  ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                  ctx.fill();
+                }
+              } catch (err) {
+                console.error('draw_occupancy_grid error', err);
+              }
+            }
+          } catch (err2) {
+            console.error('Error procesando /map:', err2);
+          }
+        });
+      } catch (e) {
+        console.warn('No se pudo subscribir a /map con tipo', type, e);
+        if (typeIndex + 1 < 2) trySubscribeMap(typeIndex + 1);
+      }
+    })(0);
+
+    setTimeout(function () {
+      addAlert('Panel conectado. Nav2 listo.', 'info');
+      safeSetText(el.svcStatusText, 'Sistema listo.');
       if (currentMode === 'manual') setControlsEnabled(true);
     }, 1500);
   });
@@ -206,7 +341,7 @@ function connectToROS() {
   ros.on('error', function (err) {
     console.error('ROS WebSocket error:', err);
     setConnectionStatus('Error de conexión', 'Fallo de WebSocket');
-    el.svcStatusText.textContent = 'Error de conexión con rosbridge.';
+    safeSetText(el.svcStatusText, 'Error de conexión con rosbridge.');
     el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
   });
@@ -218,11 +353,14 @@ function connectToROS() {
     mapTopic = null;
     odomTopic = null;
     currentMapData = null;
+    window.mapScene = null;
+    window.lastMapMsg = null;
+    window.mapImageData = null;
     setConnectionStatus('Desconectado', 'Conexión cerrada');
     el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
     setControlsEnabled(false);
-    el.svcStatusText.textContent = 'Desconectado de ROS2.';
+    safeSetText(el.svcStatusText, 'Desconectado de ROS2.');
   });
 }
 
@@ -262,8 +400,8 @@ setInterval(function () {
       linear: { x: 0, y: 0, z: 0 }, angular: { x: 0, y: 0, z: 0 }
     }));
     isMoving = false;
-    el.serviceStatus.textContent = 'Detenido';
-    el.svcStatusText.textContent = 'Robot detenido.';
+    safeSetText(el.serviceStatus, 'Detenido');
+    safeSetText(el.svcStatusText, 'Robot detenido.');
   }
 }, DT * 1000);
 
@@ -288,9 +426,9 @@ function setupHoldButton(btnId, direction) {
     if (!isConnected || currentMode !== 'manual') return;
     targetLinear = d.lin;
     targetAngular = d.ang;
-    el.lastCommand.textContent = lbl;
-    el.serviceStatus.textContent = 'Acelerando...';
-    el.svcStatusText.textContent = 'Movimiento: ' + lbl;
+    safeSetText(el.lastCommand, lbl);
+    safeSetText(el.serviceStatus, 'Acelerando...');
+    safeSetText(el.svcStatusText, 'Movimiento: ' + lbl);
   }
 
   function onStop(e) {
@@ -298,8 +436,8 @@ function setupHoldButton(btnId, direction) {
     if (currentMode !== 'manual') return;
     targetLinear = targetAngular = 0;
     if (isConnected) {
-      el.serviceStatus.textContent = 'Frenando...';
-      el.svcStatusText.textContent = 'Desacelerando...';
+      safeSetText(el.serviceStatus, 'Frenando...');
+      safeSetText(el.svcStatusText, 'Desacelerando...');
     }
   }
 
@@ -318,9 +456,9 @@ setupHoldButton('btnRight', 'right');
 el.btnStop.addEventListener('click', function () {
   if (!isConnected || currentMode !== 'manual') return;
   targetLinear = targetAngular = currentLinear = currentAngular = 0;
-  el.lastCommand.textContent = 'STOP';
-  el.serviceStatus.textContent = 'Freno de emergencia';
-  el.svcStatusText.textContent = 'Freno de emergencia aplicado.';
+  safeSetText(el.lastCommand, 'STOP');
+  safeSetText(el.serviceStatus, 'Freno de emergencia');
+  safeSetText(el.svcStatusText, 'Freno de emergencia aplicado.');
 });
 
 /* ── Keyboard shortcuts ─────────────────────────────────── */
@@ -339,24 +477,24 @@ document.addEventListener('keydown', function (e) {
     case 'ArrowUp':
     case 'KeyW':
       targetLinear = MAX_LIN; targetAngular = 0;
-      el.lastCommand.textContent = 'Adelante (teclado)'; break;
+      safeSetText(el.lastCommand, 'Adelante (teclado)'); break;
     case 'ArrowDown':
     case 'KeyS':
       targetLinear = -MAX_LIN; targetAngular = 0;
-      el.lastCommand.textContent = 'Atrás (teclado)'; break;
+      safeSetText(el.lastCommand, 'Atrás (teclado)'); break;
     case 'ArrowLeft':
     case 'KeyA':
       targetLinear = 0; targetAngular = MAX_ANG;
-      el.lastCommand.textContent = 'Izquierda (teclado)'; break;
+      safeSetText(el.lastCommand, 'Izquierda (teclado)'); break;
     case 'ArrowRight':
     case 'KeyD':
       targetLinear = 0; targetAngular = -MAX_ANG;
-      el.lastCommand.textContent = 'Derecha (teclado)'; break;
+      safeSetText(el.lastCommand, 'Derecha (teclado)'); break;
     case 'Space':
       e.preventDefault();
       targetLinear = targetAngular = currentLinear = currentAngular = 0;
-      el.lastCommand.textContent = 'STOP (teclado)';
-      el.serviceStatus.textContent = 'Freno de emergencia'; break;
+      safeSetText(el.lastCommand, 'STOP (teclado)');
+      safeSetText(el.serviceStatus, 'Freno de emergencia'); break;
   }
 });
 
@@ -372,20 +510,20 @@ function setOperationMode(mode) {
   currentMode = mode;
 
   if (mode === 'manual') {
-    el.modeToggle.checked = false;
-    el.modeNameText.textContent = 'Manual';
-    el.modeDescText.textContent = 'Control directo del operador';
-    el.currentModeText.textContent = 'Manual';
-    el.currentModeText.className = 'mode-pill manual';
+    if (el.modeToggle) el.modeToggle.checked = false;
+    safeSetText(el.modeNameText, 'Manual');
+    safeSetText(el.modeDescText, 'Control directo del operador');
+    safeSetText(el.currentModeText, 'Manual');
+    if (el.currentModeText) el.currentModeText.className = 'mode-pill manual';
     setControlsEnabled(isConnected);
     targetLinear = targetAngular = 0;
 
   } else if (mode === 'auto') {
-    el.modeToggle.checked = true;
-    el.modeNameText.textContent = 'Automático';
-    el.modeDescText.textContent = 'Patrulla autónoma Nav2 activa';
-    el.currentModeText.textContent = 'Automático';
-    el.currentModeText.className = 'mode-pill auto';
+    if (el.modeToggle) el.modeToggle.checked = true;
+    safeSetText(el.modeNameText, 'Automático');
+    safeSetText(el.modeDescText, 'Patrulla autónoma Nav2 activa');
+    safeSetText(el.currentModeText, 'Automático');
+    if (el.currentModeText) el.currentModeText.className = 'mode-pill auto';
     setControlsEnabled(false);
     iniciarPatrulla();
   }
@@ -400,7 +538,7 @@ function iniciarPatrulla() {
   }
 
   addAlert('Iniciando patrulla autónoma...', 'info');
-  el.svcStatusText.textContent = 'Enviando ruta a Nav2...';
+  safeSetText(el.svcStatusText, 'Enviando ruta a Nav2...');
 
   var patrolSrv = new ROSLIB.Service({
     ros: ros, name: '/start_patrol', serviceType: 'std_srvs/srv/Trigger'
@@ -408,13 +546,13 @@ function iniciarPatrulla() {
 
   patrolSrv.callService(new ROSLIB.ServiceRequest({}), function (result) {
     if (result && result.success) {
-      el.serviceStatus.textContent = 'Patrullando';
-      el.svcStatusText.textContent = 'Patrulla autónoma activa.';
+      safeSetText(el.serviceStatus, 'Patrullando');
+      safeSetText(el.svcStatusText, 'Patrulla autónoma activa.');
       addAlert('Patrulla iniciada correctamente.', 'info');
     } else {
       var msg = (result && result.message) ? result.message : 'Sin respuesta';
-      el.serviceStatus.textContent = 'Error Nav2';
-      el.svcStatusText.textContent = 'Fallo al iniciar patrulla: ' + msg;
+      safeSetText(el.serviceStatus, 'Error Nav2');
+      safeSetText(el.svcStatusText, 'Fallo al iniciar patrulla: ' + msg);
       addAlert('Error al iniciar patrulla: ' + msg, 'critical');
     }
   });
@@ -430,4 +568,4 @@ el.modeToggle.addEventListener('change', function (e) {
 
 /* ── Init ───────────────────────────────────────────────── */
 setOperationMode('manual');
-setControlsEnabled(false);
+setControlsEnabled(true);
