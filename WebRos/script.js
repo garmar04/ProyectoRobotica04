@@ -5,49 +5,53 @@
 'use strict';
 
 /* ── State ─────────────────────────────────────────────── */
-let ros           = null;
-let isConnected   = false;
-let cmdVelTopic   = null;
-let alertsTopic   = null;
-let currentMode   = 'manual';
+let ros = null;
+let isConnected = false;
+let cmdVelTopic = null;
+let alertsTopic = null;
+let mapTopic = null;
+let odomTopic = null;
+let currentMode = 'manual';
 
-let targetLinear  = 0.0;
+let targetLinear = 0.0;
 let targetAngular = 0.0;
 let currentLinear = 0.0;
-let currentAngular= 0.0;
-let isMoving      = false;
+let currentAngular = 0.0;
+let isMoving = false;
+let currentMapData = null;
+let currentRobotPos = { x: 0, y: 0 };
 
-const MAX_LIN    = 0.5;
-const MAX_ANG    = 0.5;
-const ACCEL_LIN  = 0.4;
-const ACCEL_ANG  = 1.0;
-const DT         = 0.05;
+const MAX_LIN = 0.5;
+const MAX_ANG = 0.5;
+const ACCEL_LIN = 0.4;
+const ACCEL_ANG = 1.0;
+const DT = 0.05;
 
 /* ── DOM refs ───────────────────────────────────────────── */
 const el = {
-  websocketUrl:     document.getElementById('websocketUrl'),
-  connectBtn:       document.getElementById('connectBtn'),
-  disconnectBtn:    document.getElementById('disconnectBtn'),
-  statusDot:        document.getElementById('statusDot'),
-  statusText:       document.getElementById('statusText'),
+  websocketUrl: document.getElementById('websocketUrl'),
+  connectBtn: document.getElementById('connectBtn'),
+  disconnectBtn: document.getElementById('disconnectBtn'),
+  statusDot: document.getElementById('statusDot'),
+  statusText: document.getElementById('statusText'),
   connectionStatus: document.getElementById('connectionStatus'),
-  lastEvent:        document.getElementById('lastEvent'),
-  currentTime:      document.getElementById('currentTime'),
-  btnForward:       document.getElementById('btnForward'),
-  btnBackward:      document.getElementById('btnBackward'),
-  btnLeft:          document.getElementById('btnLeft'),
-  btnRight:         document.getElementById('btnRight'),
-  btnStop:          document.getElementById('btnStop'),
-  lastCommand:      document.getElementById('lastCommand'),
-  serviceStatus:    document.getElementById('serviceStatus'),
-  svcStatusText:    document.getElementById('svcStatusText'),
-  alertsList:       document.getElementById('alertsList'),
-  alertsCount:      document.getElementById('alertsCount'),
-  clearAlertsBtn:   document.getElementById('clearAlertsBtn'),
-  modeToggle:       document.getElementById('modeToggle'),
-  modeNameText:     document.getElementById('modeNameText'),
-  modeDescText:     document.getElementById('modeDescText'),
-  currentModeText:  document.getElementById('currentModeText'),
+  lastEvent: document.getElementById('lastEvent'),
+  currentTime: document.getElementById('currentTime'),
+  btnForward: document.getElementById('btnForward'),
+  btnBackward: document.getElementById('btnBackward'),
+  btnLeft: document.getElementById('btnLeft'),
+  btnRight: document.getElementById('btnRight'),
+  btnStop: document.getElementById('btnStop'),
+  lastCommand: document.getElementById('lastCommand'),
+  serviceStatus: document.getElementById('serviceStatus'),
+  svcStatusText: document.getElementById('svcStatusText'),
+  alertsList: document.getElementById('alertsList'),
+  alertsCount: document.getElementById('alertsCount'),
+  clearAlertsBtn: document.getElementById('clearAlertsBtn'),
+  modeToggle: document.getElementById('modeToggle'),
+  modeNameText: document.getElementById('modeNameText'),
+  modeDescText: document.getElementById('modeDescText'),
+  currentModeText: document.getElementById('currentModeText'),
 };
 
 /* ── Clock ──────────────────────────────────────────────── */
@@ -62,15 +66,15 @@ updateTime();
 /* ── Connection status ──────────────────────────────────── */
 function setConnectionStatus(label, eventLabel) {
   el.connectionStatus.textContent = label;
-  el.statusText.textContent       = label;
+  el.statusText.textContent = label;
 
   if (eventLabel) {
     el.lastEvent.textContent = `${eventLabel} — ${new Date().toLocaleTimeString('es-ES')}`;
   }
 
   el.statusDot.className = 'status-dot';
-  if (label === 'Conectado')         el.statusDot.classList.add('connected');
-  else if (label.includes('Error'))  el.statusDot.classList.add('error');
+  if (label === 'Conectado') el.statusDot.classList.add('connected');
+  else if (label.includes('Error')) el.statusDot.classList.add('error');
 }
 
 /* ── Control buttons enable/disable ────────────────────── */
@@ -96,7 +100,7 @@ function addAlert(message, severity) {
 
   const timeStr = new Date().toLocaleTimeString('es-ES');
   item.innerHTML = '<div class="alert-time">' + timeStr + '</div>' +
-                   '<div class="alert-message">' + message + '</div>';
+    '<div class="alert-message">' + message + '</div>';
 
   el.alertsList.insertBefore(item, el.alertsList.firstChild);
   alertItemCount++;
@@ -121,7 +125,7 @@ function connectToROS() {
   ros.on('connection', function () {
     isConnected = true;
     setConnectionStatus('Conectado', 'Conexión establecida');
-    el.connectBtn.disabled    = true;
+    el.connectBtn.disabled = true;
     el.disconnectBtn.disabled = false;
     el.svcStatusText.textContent = 'ROS2 conectado. Inicializando tópicos...';
 
@@ -134,8 +138,39 @@ function connectToROS() {
     });
     alertsTopic.subscribe(function (msg) {
       var text = msg.data || JSON.stringify(msg);
-      var sev  = /critical/i.test(text) ? 'critical' : 'info';
+      var sev = /critical/i.test(text) ? 'critical' : 'info';
       addAlert(text, sev);
+    });
+
+    //Subscribe to the map topic
+    var canvasMap = document.getElementById("map");
+    mapTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/map',
+      messageType: 'nav_msgs/msg/OccupancyGrid'
+    });
+
+    mapTopic.subscribe((message) => {
+      var placeholder = document.getElementById('mapPlaceholder');
+      if (placeholder) placeholder.style.display = 'none';
+      if (canvasMap) canvasMap.style.display = 'block';
+      currentMapData = message;
+      draw_occupancy_grid(canvasMap, currentMapData, currentRobotPos);
+    });
+
+    // Subscribe to the /odom topic for robot position
+    odomTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/odom',
+      messageType: 'nav_msgs/msg/Odometry'
+    });
+
+    odomTopic.subscribe((message) => {
+      currentRobotPos.x = message.pose.pose.position.x;
+      currentRobotPos.y = message.pose.pose.position.y;
+      if (currentMapData && canvasMap) {
+        draw_occupancy_grid(canvasMap, currentMapData, currentRobotPos);
+      }
     });
 
     var initialPoseTopic = new ROSLIB.Topic({
@@ -148,16 +183,16 @@ function connectToROS() {
         header: { frame_id: 'map', stamp: { sec: 0, nanosec: 0 } },
         pose: {
           pose: {
-            position:    { x: 0.0, y: 0.0, z: 0.0 },
+            position: { x: 0.0, y: 0.0, z: 0.0 },
             orientation: { w: 1.0, x: 0.0, y: 0.0, z: 0.0 }
           },
           covariance: [
-            0.25,0,0,0,0,0,
-            0,0.25,0,0,0,0,
-            0,0,0,0,0,0,
-            0,0,0,0,0,0,
-            0,0,0,0,0,0,
-            0,0,0,0,0,0.068
+            0.25, 0, 0, 0, 0, 0,
+            0, 0.25, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0.068
           ]
         }
       });
@@ -172,16 +207,19 @@ function connectToROS() {
     console.error('ROS WebSocket error:', err);
     setConnectionStatus('Error de conexión', 'Fallo de WebSocket');
     el.svcStatusText.textContent = 'Error de conexión con rosbridge.';
-    el.connectBtn.disabled    = false;
+    el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
   });
 
   ros.on('close', function () {
-    isConnected    = false;
-    cmdVelTopic    = null;
-    alertsTopic    = null;
+    isConnected = false;
+    cmdVelTopic = null;
+    alertsTopic = null;
+    mapTopic = null;
+    odomTopic = null;
+    currentMapData = null;
     setConnectionStatus('Desconectado', 'Conexión cerrada');
-    el.connectBtn.disabled    = false;
+    el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
     setControlsEnabled(false);
     el.svcStatusText.textContent = 'Desconectado de ROS2.';
@@ -207,14 +245,14 @@ function smoothStep(current, target, step) {
 setInterval(function () {
   if (!isConnected || !cmdVelTopic || currentMode !== 'manual') return;
 
-  currentLinear  = smoothStep(currentLinear,  targetLinear,  ACCEL_LIN * DT);
+  currentLinear = smoothStep(currentLinear, targetLinear, ACCEL_LIN * DT);
   currentAngular = smoothStep(currentAngular, targetAngular, ACCEL_ANG * DT);
 
   var stillMoving = Math.abs(currentLinear) > 0.001 || Math.abs(currentAngular) > 0.001;
 
   if (stillMoving) {
     cmdVelTopic.publish(new ROSLIB.Message({
-      linear:  { x: currentLinear,  y: 0, z: 0 },
+      linear: { x: currentLinear, y: 0, z: 0 },
       angular: { x: 0, y: 0, z: currentAngular }
     }));
     isMoving = true;
@@ -231,10 +269,10 @@ setInterval(function () {
 
 /* ── Hold-to-move buttons ───────────────────────────────── */
 var dirMap = {
-  forward:  { lin:  MAX_LIN, ang: 0 },
+  forward: { lin: MAX_LIN, ang: 0 },
   backward: { lin: -MAX_LIN, ang: 0 },
-  left:     { lin: 0, ang:  MAX_ANG },
-  right:    { lin: 0, ang: -MAX_ANG }
+  left: { lin: 0, ang: MAX_ANG },
+  right: { lin: 0, ang: -MAX_ANG }
 };
 var dirLabels = {
   forward: 'Adelante', backward: 'Atrás', left: 'Izquierda', right: 'Derecha'
@@ -242,15 +280,15 @@ var dirLabels = {
 
 function setupHoldButton(btnId, direction) {
   var btn = document.getElementById(btnId);
-  var d   = dirMap[direction];
+  var d = dirMap[direction];
   var lbl = dirLabels[direction];
 
   function onStart(e) {
     e.preventDefault();
     if (!isConnected || currentMode !== 'manual') return;
-    targetLinear  = d.lin;
+    targetLinear = d.lin;
     targetAngular = d.ang;
-    el.lastCommand.textContent   = lbl;
+    el.lastCommand.textContent = lbl;
     el.serviceStatus.textContent = 'Acelerando...';
     el.svcStatusText.textContent = 'Movimiento: ' + lbl;
   }
@@ -265,22 +303,22 @@ function setupHoldButton(btnId, direction) {
     }
   }
 
-  btn.addEventListener('mousedown',  onStart);
-  btn.addEventListener('mouseup',    onStop);
+  btn.addEventListener('mousedown', onStart);
+  btn.addEventListener('mouseup', onStop);
   btn.addEventListener('mouseleave', onStop);
   btn.addEventListener('touchstart', onStart, { passive: false });
-  btn.addEventListener('touchend',   onStop,  { passive: false });
+  btn.addEventListener('touchend', onStop, { passive: false });
 }
 
-setupHoldButton('btnForward',  'forward');
+setupHoldButton('btnForward', 'forward');
 setupHoldButton('btnBackward', 'backward');
-setupHoldButton('btnLeft',     'left');
-setupHoldButton('btnRight',    'right');
+setupHoldButton('btnLeft', 'left');
+setupHoldButton('btnRight', 'right');
 
 el.btnStop.addEventListener('click', function () {
   if (!isConnected || currentMode !== 'manual') return;
   targetLinear = targetAngular = currentLinear = currentAngular = 0;
-  el.lastCommand.textContent   = 'STOP';
+  el.lastCommand.textContent = 'STOP';
   el.serviceStatus.textContent = 'Freno de emergencia';
   el.svcStatusText.textContent = 'Freno de emergencia aplicado.';
 });
@@ -317,13 +355,13 @@ document.addEventListener('keydown', function (e) {
     case 'Space':
       e.preventDefault();
       targetLinear = targetAngular = currentLinear = currentAngular = 0;
-      el.lastCommand.textContent   = 'STOP (teclado)';
+      el.lastCommand.textContent = 'STOP (teclado)';
       el.serviceStatus.textContent = 'Freno de emergencia'; break;
   }
 });
 
 document.addEventListener('keyup', function (e) {
-  var movKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyS','KeyA','KeyD'];
+  var movKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'];
   if (movKeys.indexOf(e.code) !== -1 && currentMode === 'manual') {
     targetLinear = targetAngular = 0;
   }
@@ -334,20 +372,20 @@ function setOperationMode(mode) {
   currentMode = mode;
 
   if (mode === 'manual') {
-    el.modeToggle.checked          = false;
-    el.modeNameText.textContent    = 'Manual';
-    el.modeDescText.textContent    = 'Control directo del operador';
+    el.modeToggle.checked = false;
+    el.modeNameText.textContent = 'Manual';
+    el.modeDescText.textContent = 'Control directo del operador';
     el.currentModeText.textContent = 'Manual';
-    el.currentModeText.className   = 'mode-pill manual';
+    el.currentModeText.className = 'mode-pill manual';
     setControlsEnabled(isConnected);
     targetLinear = targetAngular = 0;
 
   } else if (mode === 'auto') {
-    el.modeToggle.checked          = true;
-    el.modeNameText.textContent    = 'Automático';
-    el.modeDescText.textContent    = 'Patrulla autónoma Nav2 activa';
+    el.modeToggle.checked = true;
+    el.modeNameText.textContent = 'Automático';
+    el.modeDescText.textContent = 'Patrulla autónoma Nav2 activa';
     el.currentModeText.textContent = 'Automático';
-    el.currentModeText.className   = 'mode-pill auto';
+    el.currentModeText.className = 'mode-pill auto';
     setControlsEnabled(false);
     iniciarPatrulla();
   }

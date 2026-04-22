@@ -6,6 +6,10 @@
     <title>Control Robot de Vigilancia - Fábrica</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/easeljs@1/lib/easeljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/eventemitter2@6.4.9/lib/eventemitter2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ros2d@0.10.0/build/ros2d.min.js"></script>
+    <script src="static/js/draw_occupancy_grid.js"></script>
 </head>
 <body>
   
@@ -111,7 +115,7 @@
                     <div class="viewer-container">
                         <h3>Mapa de Navegación</h3>
                         <div id="mapViewer" class="viewer">
-                            <div class="viewer-placeholder">
+                            <div class="viewer-placeholder" id="mapPlaceholder">
                                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
                                     <line x1="8" y1="2" x2="8" y2="18"/>
@@ -119,6 +123,7 @@
                                 </svg>
                                 <p>Esperando mapa</p>
                             </div>
+                            <canvas id="map" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;"></canvas>
                         </div>
                     </div>
                 </div>
