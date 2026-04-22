@@ -46,6 +46,11 @@ sleep 8
 echo "[3/7] 🧠 Levantando Nav2..."
 ros2 launch nav2_bringup bringup_launch.py use_sim_time:=true map:=$WORKSPACE_DIR/mapa_warehouse.yaml &
 NAV_PID=$!
+
+# Publicar Pose Inicial automáticamente después de un pequeño retraso
+(sleep 5; ros2 topic pub -1 /initialpose geometry_msgs/msg/PoseWithCovarianceStamped '{header: {frame_id: "map"}, pose: {pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}}}') &
+POSE_PID=$!
+
 sleep 15
 
 echo "[3.5/7] 🐢 Configurando giros lentos en modo automático..."
@@ -78,6 +83,6 @@ echo "🐢 Modo automático ahora hace giros suaves (0.35 rad/s)"
 echo "====================================================="
 echo "Presiona Ctrl+C para apagar todo."
 
-trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
+trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID \$POSE_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
 
 wait
