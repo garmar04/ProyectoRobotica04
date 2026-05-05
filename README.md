@@ -17,6 +17,119 @@ Contenido del repositorio
 - `start.sh` — script de conveniencia que inicia todos los componentes (limpieza, entorno, web, simulador, Nav2, rosbridge, nodos puente, RViz).
 - `build/`, `install/` — artefactos de compilación (generados por `colcon build`).
 
+Estructura de archivos
+A continuación se muestra la organización principal del repositorio (se omiten `node_modules/`, `build/` e `install/`):
+
+```text
+ProyectoRobotica04/
+├── README.md
+├── start.sh                          # Script de arranque (limpia, lanza web, sim, Nav2, rosbridge, RViz)
+├── comandos.txt                      # Comandos útiles de referencia
+├── mapa_warehouse.pgm                # Mapa (imagen) usado por Nav2
+├── mapa_warehouse.yaml               # Metadatos del mapa (resolución, origen, etc.)
+│
+├── scripts/
+│   └── publish_initialpose.py        # Publica la pose inicial del robot en /initialpose
+│
+├── WebRos/                           # Aplicación web (Vite + React + TypeScript)
+│   ├── index.html                    # Entrada principal de la UI
+│   ├── landing.html                  # Página de aterrizaje
+│   ├── login.html                    # Página de login
+│   ├── registro.html                 # Página de registro
+│   ├── script.js                     # Lógica cliente: rosbridge, mapa, controles
+│   ├── styles.css                    # Estilos principales
+│   ├── velaris.css                   # Tema/estilos adicionales
+│   ├── package.json                  # Dependencias y scripts npm
+│   ├── vite.config.ts                # Configuración de Vite
+│   ├── tailwind.config.js            # Configuración de Tailwind
+│   ├── postcss.config.js             # Configuración de PostCSS
+│   ├── eslint.config.js              # Reglas de linting
+│   ├── tsconfig*.json                # Configuraciones de TypeScript
+│   ├── src/
+│   │   ├── main.tsx                  # Punto de entrada React
+│   │   ├── App.tsx                   # Componente raíz
+│   │   ├── index.css                 # Estilos del bundle React
+│   │   └── vite-env.d.ts             # Tipados de Vite
+│   └── static/
+│       └── js/
+│           └── draw_occupancy_grid.js  # Renderizado del minimapa (occupancy grid)
+│
+├── proy_andres/                      # Workspace de paquetes ROS2 del proyecto
+│   ├── README.md
+│   ├── proy_andres/                  # Metapaquete (CMake)
+│   │   ├── CMakeLists.txt
+│   │   └── package.xml
+│   ├── proy_andres_interface/        # Definición de servicios/mensajes personalizados
+│   │   ├── CMakeLists.txt
+│   │   ├── package.xml
+│   │   └── srv/
+│   │       └── MyMoveMsg.srv
+│   ├── proy_andres_captacion/        # Paquete Python para captación de datos
+│   │   ├── package.xml
+│   │   ├── setup.py
+│   │   ├── setup.cfg
+│   │   ├── resource/
+│   │   ├── test/
+│   │   └── proy_andres_captacion/
+│   │       └── __init__.py
+│   ├── proy_andres_nav_punto/        # Navegación a un punto + teleop web
+│   │   ├── package.xml
+│   │   ├── setup.py
+│   │   ├── setup.cfg
+│   │   ├── resource/
+│   │   ├── test/
+│   │   └── proy_andres_nav_punto/
+│   │       ├── __init__.py
+│   │       ├── ir_a_punto.py         # Cliente Nav2 para ir a coordenadas
+│   │       └── web_teleop_service.py # Servicio para teleop desde la UI
+│   ├── proy_andres_nav_ruta/         # Navegación por ruta / patrulla
+│   │   ├── package.xml
+│   │   ├── setup.py
+│   │   ├── setup.cfg
+│   │   ├── resource/
+│   │   ├── test/
+│   │   └── proy_andres_nav_ruta/
+│   │       ├── __init__.py
+│   │       ├── patrulla_bridge.py    # Puente entre la UI y el nodo de patrulla
+│   │       └── patrullar.py          # Lógica de patrullaje
+│   └── proy_andres_mundo/            # Mundo, modelos, lanzadores y parámetros
+│       ├── CMakeLists.txt
+│       ├── package.xml
+│       ├── launch/
+│       │   ├── warehouse.launch.py
+│       │   └── warehouse_simulation.launch
+│       ├── worlds/
+│       │   └── warehouse.world
+│       ├── param/                    # Parámetros de costmap / planner
+│       │   ├── base_local_planner_params.yaml
+│       │   ├── costmap_common_params.yaml
+│       │   ├── global_costmap_params.yaml
+│       │   ├── local_costmap_params.yaml
+│       │   ├── move_base_params.yaml
+│       │   └── navfn.yaml
+│       ├── rviz/
+│       │   └── navigation.rviz
+│       ├── src/
+│       │   └── control_manual.cpp    # Nodo C++ de control manual
+│       ├── urdf/                     # Descripción del robot Pioneer 3DX
+│       │   ├── materials.xacro
+│       │   ├── pioneer3dx.xacro
+│       │   ├── pioneer3dx_body.xacro
+│       │   └── pioneer3dx_wheel.xacro
+│       ├── meshes/                   # Mallas STL/OBJ del robot
+│       ├── models/                   # Modelos del entorno (workcell, etc.)
+│       └── img/                      # GIFs/capturas del proyecto
+│
+└── turtlebot3_simulations/           # Paquetes externos de simulación TurtleBot3
+    ├── README.md
+    ├── LICENSE
+    ├── CONTRIBUTING.md
+    ├── turtlebot3_simulations_ci.repos
+    ├── turtlebot3_fake_node/
+    ├── turtlebot3_gazebo/
+    └── turtlebot3_simulations/
+```
+
 Requisitos
 - Linux (Ubuntu 22.04 o similar recomendado).
 - ROS 2 (se usa `jazzy` en los scripts; puede adaptarse a otra distribución: `source /opt/ros/<distro>/setup.bash`).
