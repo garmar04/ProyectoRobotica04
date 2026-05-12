@@ -42,20 +42,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!historialBody) return;
 
         if (filteredAlerts.length === 0) {
-            historialBody.innerHTML = '<tr><td colspan="5">No se encontraron alertas que coincidan con los filtros.</td></tr>';
+            historialBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">No se encontraron alertas que coincidan con los filtros.</td></tr>';
             return;
         }
 
         historialBody.innerHTML = filteredAlerts.map(a => {
             const rowId = `desc-row-${a.id_alerta}`;
+            const isImage = a.tipo_alerta && a.tipo_alerta.toLowerCase() === 'imagen';
+            
+            let actionHtml;
+            if (isImage) {
+                // Escapamos comillas simples en las cadenas para evitar problemas al inyectarlas en el evento onclick
+                const imgPath = (a.ruta_imagen || '').replace(/'/g, "\\'");
+                const desc = (a.descripcion || '').replace(/'/g, "\\'");
+                actionHtml = `<button class="btn-link" onclick="openImageModal('${imgPath}', '${desc}')">Ver captura</button>`;
+            } else {
+                actionHtml = `<button class="btn-link" onclick="toggleDescription('${rowId}')">Ver detalles</button>`;
+            }
+
             return `
                 <tr>
                     <td>#${a.id_alerta}</td>
                     <td>${a.tipo_alerta || '-'}</td>
-                    <td>${a.nivel || '-'}</td>
+                    <td><span style="color: ${a.nivel === 'Alta' ? 'var(--danger-color)' : (a.nivel === 'Media' ? 'var(--warning-color)' : 'var(--success-color)')}; font-weight: 600;">${a.nivel || '-'}</span></td>
                     <td>${formatDate(a.fecha_hora)}</td>
-                    <td><button class="btn-link" onclick="toggleDescription('${rowId}')">Ver detalles</button></td>
+                    <td>${actionHtml}</td>
                 </tr>
+                ${!isImage ? `
                 <tr id="${rowId}" class="description-row">
                     <td colspan="5">
                         <div class="description-cell">
@@ -63,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </td>
                 </tr>
+                ` : ''}
             `;
         }).join('');
     }
@@ -105,6 +119,43 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.toggle('active');
         }
     };
+
+    window.openImageModal = function(imagePath, description) {
+        const modal = document.getElementById('imageModal');
+        const img = document.getElementById('modalImage');
+        const desc = document.getElementById('modalDescription');
+        
+        if (modal && img && desc) {
+            // Usa placeholder si no hay ruta válida
+            const fallbackPath = 'assets/deteccion_opencv_placeholder.jpg';
+            img.src = imagePath || fallbackPath;
+            
+            // Fallback al placeholder si la imagen falla al cargar
+            img.onerror = function() {
+                this.src = fallbackPath;
+                this.onerror = null; // Evitar loop infinito si el placeholder tampoco existe
+            };
+            
+            desc.innerHTML = `<strong>Descripción de alerta:</strong><br>${description || 'Sin descripción detallada.'}`;
+            modal.classList.add('active');
+        }
+    };
+
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const imageModal = document.getElementById('imageModal');
+    
+    if (closeModalBtn && imageModal) {
+        closeModalBtn.addEventListener('click', () => {
+            imageModal.classList.remove('active');
+        });
+        
+        // Cerrar al hacer clic en el overlay (fuera del contenido)
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal) {
+                imageModal.classList.remove('active');
+            }
+        });
+    }
 
     if (btnAplicarFiltros) {
         btnAplicarFiltros.addEventListener('click', loadAndFilterAlerts);

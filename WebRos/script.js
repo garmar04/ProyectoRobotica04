@@ -510,7 +510,8 @@ function connectToROS() {
         cameraTopic2.unsubscribe();
         
         // Mostrar la imagen procesada
-        img.src = 'data:image/jpeg;base64,' + msg.data;
+        var imageBase64 = 'data:image/jpeg;base64,' + msg.data;
+        img.src = imageBase64;
         img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)'; // Efecto visual para el flash
         
         if (flashTimeout) clearTimeout(flashTimeout);
@@ -519,6 +520,24 @@ function connectToROS() {
             cameraTopic.subscribe(handleCameraMessage);
             cameraTopic2.subscribe(handleCameraMessage);
         }, 1000);
+
+        // --- GENERAR ALERTA DE IMAGEN (Punto de Control) ---
+        if (window.VelarisDB) {
+            const robot = getActiveRobot();
+            if (robot) {
+                const pos = currentRobotPos || { x: 0, y: 0 };
+                window.VelarisDB.createAlert({
+                    id_robot: robot.id_robot,
+                    tipo_alerta: 'imagen',
+                    descripcion: 'Control rutinario completado en el punto de patrulla actual.',
+                    nivel: 'Baja', // Informativa
+                    coord_x: pos.x || 0,
+                    coord_y: pos.y || 0,
+                    ruta_imagen: imageBase64
+                });
+                renderDatabasePanel();
+            }
+        }
     });
 
     setTimeout(function () {
@@ -786,3 +805,33 @@ if (el.robotSelect && window.VelarisDB) {
 renderDatabasePanel();
 setOperationMode('manual');
 setControlsEnabled(true);
+
+/* ── Scripts de Simulación y Pruebas ────────────────────── */
+window.simularLlegadaPuntoControl = function() {
+    if (!window.VelarisDB) {
+        console.error('VelarisDB no está disponible.');
+        return;
+    }
+    const robot = getActiveRobot();
+    if (!robot) {
+        console.error('No hay un robot activo seleccionado para simular el evento.');
+        return;
+    }
+
+    const pos = currentRobotPos || { x: 0, y: 0 };
+    // Usamos el placeholder por defecto como simulacion
+    const placeholderBase64 = 'assets/deteccion_opencv_placeholder.jpg'; 
+    
+    window.VelarisDB.createAlert({
+        id_robot: robot.id_robot,
+        tipo_alerta: 'imagen',
+        descripcion: 'SIMULACIÓN: Control rutinario completado en el punto de patrulla.',
+        nivel: 'Baja',
+        coord_x: pos.x || 0,
+        coord_y: pos.y || 0,
+        ruta_imagen: placeholderBase64
+    });
+    
+    renderDatabasePanel();
+    console.log('✅ Simulación de llegada a punto de control ejecutada con éxito. Revisa el Dashboard de Alertas.');
+};

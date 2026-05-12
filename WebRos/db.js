@@ -301,7 +301,7 @@
     return deteccion;
   }
 
-  function createAlert({ id_robot, id_deteccion, tipo_alerta, descripcion, nivel, coord_x, coord_y }) {
+  function createAlert({ id_robot, id_deteccion, tipo_alerta, descripcion, nivel, coord_x, coord_y, ruta_imagen }) {
     const db = init();
     const alerta = {
       id_alerta: nextId(db, 'alerta'),
@@ -313,6 +313,7 @@
       fecha_hora: nowISO(),
       coord_x: Number(coord_x || 0),
       coord_y: Number(coord_y || 0),
+      ruta_imagen: ruta_imagen || null,
       estado_alerta: 'pendiente',
     };
     db.alertas.push(alerta);
