@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'procesador_imagen = proy_andres_captacion.procesador_imagen:main',
         ],
     },
 )

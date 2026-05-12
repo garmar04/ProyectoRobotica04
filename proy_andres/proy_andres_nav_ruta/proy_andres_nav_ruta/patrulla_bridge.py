@@ -9,90 +9,72 @@ nodo construye los waypoints de patrulla y los envía a Nav2 mediante un
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionClient
 from std_srvs.srv import Trigger
-from nav2_msgs.action import FollowWaypoints
 from geometry_msgs.msg import PoseStamped
-
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
+import threading
 
 # Puntos de la ruta de patrulla, en el frame `map`.
 PATROL_POINTS = [(-7.0, 4.0), (-7.0, -4.0), (0.5, -7.0), (7.0, 4.0)]
 
-# Tiempo máximo de espera para que el servidor de Nav2 esté disponible.
-NAV2_WAIT_TIMEOUT_SEC = 2.0
-
-
 class PatrolBridge(Node):
-    """Nodo puente que traduce un `Trigger` en una acción `FollowWaypoints`."""
-
     def __init__(self):
-        """Configura `use_sim_time`, el servicio de entrada y el cliente de acción."""
         super().__init__('patrol_bridge_node')
-
-        # Forzamos `use_sim_time` para sincronizar con el reloj de Gazebo,
-        # de lo contrario los timestamps en los goals desfasarían a Nav2.
+        # Sincronizar con Gazebo
         self.set_parameters([
             rclpy.parameter.Parameter('use_sim_time', rclpy.Parameter.Type.BOOL, True)
         ])
-
         self.srv = self.create_service(Trigger, '/start_patrol', self.patrol_callback)
-        self._action_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
-        self.get_logger().info('Servicio Puente /start_patrol listo (Sincronizado con Gazebo).')
+        self.get_logger().info('Servicio Puente /start_patrol listo.')
+        # Cliente para el procesador de imagen
+        self.img_client = self.create_client(Trigger, 'capturar_y_procesar')
+        self.nav = None
 
     def patrol_callback(self, request, response):
-        """Callback del servicio `/start_patrol`.
-
-        Args:
-            request: Petición `Trigger` (sin payload).
-            response: Respuesta `Trigger` con `success` y `message`.
-
-        Returns:
-            La respuesta indicando si la ruta se envió correctamente a Nav2.
-        """
-        self.get_logger().info('Iniciando modo automático desde la web...')
-        try:
-            sent = self.execute_patrol()
-        except Exception as err:
-            # Cualquier fallo inesperado debe devolverse al cliente HTTP en
-            # lugar de propagarse y romper el ciclo de spin.
-            self.get_logger().error(f'Error al enviar la patrulla: {err}')
-            response.success = False
-            response.message = f'Error interno: {err}'
-            return response
-
-        if sent:
-            response.success = True
-            response.message = "Patrulla enviada a Nav2"
-        else:
-            response.success = False
-            response.message = "Nav2 no estaba disponible para recibir la patrulla"
+        self.get_logger().info('Iniciando patrulla secuencial desde la web...')
+        # Ejecutamos la patrulla en un hilo separado para no bloquear el servicio
+        threading.Thread(target=self.run_patrol_logic).start()
+        
+        response.success = True
+        response.message = "Patrulla secuencial iniciada"
         return response
 
-    def execute_patrol(self) -> bool:
-        """Construye y envía los waypoints al servidor de acción de Nav2.
+    def run_patrol_logic(self):
+        if self.nav is None:
+            self.nav = BasicNavigator()
+        
+        self.nav.waitUntilNav2Active()
 
-        Returns:
-            True si el goal fue enviado al servidor, False si Nav2 no respondió
-            dentro del tiempo de espera.
-        """
-        if not self._action_client.wait_for_server(timeout_sec=NAV2_WAIT_TIMEOUT_SEC):
-            self.get_logger().error('Nav2 no está listo aún.')
-            return False
-
-        goal_msg = FollowWaypoints.Goal()
-        for x, y in PATROL_POINTS:
+        for i, (x, y) in enumerate(PATROL_POINTS):
+            self.get_logger().info(f"Navegando al punto {i}...")
             pose = PoseStamped()
             pose.header.frame_id = 'map'
-            # Dejamos el timestamp a cero deliberadamente: si el reloj simulado
-            # aún no ha empezado, fijarlo manualmente provoca rechazos en Nav2.
             pose.pose.position.x = float(x)
             pose.pose.position.y = float(y)
             pose.pose.orientation.w = 1.0
-            goal_msg.poses.append(pose)
+            
+            self.nav.goToPose(pose)
+            while not self.nav.isTaskComplete():
+                pass
 
-        self._action_client.send_goal_async(goal_msg)
-        self.get_logger().info('¡Ruta inyectada con éxito!')
-        return True
+            if self.nav.getResult() == TaskResult.SUCCEEDED:
+                self.get_logger().info(f"Punto {i} alcanzado. Procesando imagen...")
+                self.call_image_service()
+            else:
+                self.get_logger().warn(f"No se pudo llegar al punto {i}")
+
+        self.get_logger().info("Patrulla completada con éxito.")
+
+    def call_image_service(self):
+        if not self.img_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn("Servicio de imagen no disponible.")
+            return
+
+        req = Trigger.Request()
+        # No esperamos el resultado para no complicar el hilo, 
+        # el nodo procesador ya se encarga de guardar y publicar.
+        self.img_client.call_async(req)
+        self.get_logger().info("Petición de procesamiento enviada.")
 
 
 def main(args=None):
@@ -101,7 +83,10 @@ def main(args=None):
     node = None
     try:
         node = PatrolBridge()
-        rclpy.spin(node)
+        # Usamos un MultiThreadedExecutor para permitir llamadas de servicio 
+        # mientras el hilo principal gira
+        executor = rclpy.executors.MultiThreadedExecutor()
+        rclpy.spin(node, executor=executor)
     except KeyboardInterrupt:
         if node is not None:
             node.get_logger().info('Interrupción del usuario, cerrando puente de patrulla.')

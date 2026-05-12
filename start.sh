@@ -76,6 +76,11 @@ ros2 run proy_andres_nav_ruta patrulla_bridge --ros-args -p use_sim_time:=true &
 PATROL_PID=$!
 sleep 2
 
+echo "[6.5/7] 📸 Levantando Nodo Procesador de Imagen..."
+ros2 run proy_andres_captacion procesador_imagen --ros-args -p use_sim_time:=true &
+IMG_PROC_PID=$!
+sleep 2
+
 echo "[7/7] 📺 Abriendo RViz..."
 ros2 launch nav2_bringup rviz_launch.py use_sim_time:=true &
 RVIZ_PID=$!
@@ -88,6 +93,6 @@ echo "🐢 Modo automático ahora hace giros suaves (0.35 rad/s)"
 echo "====================================================="
 echo "Presiona Ctrl+C para apagar todo."
 
-trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID \$POSE_PID \$COMPRESS_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
+trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID \$POSE_PID \$COMPRESS_PID \$IMG_PROC_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
 
 wait

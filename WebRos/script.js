@@ -493,6 +493,34 @@ function connectToROS() {
     });
     cameraTopic2.subscribe(handleCameraMessage);
 
+    // Flash de imagen procesada (OpenCV)
+    var processedTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/processed/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+
+    let flashTimeout = null;
+    processedTopic.subscribe(function(msg) {
+        var img = document.getElementById('cameraStream');
+        if (!img) return;
+        
+        // Bloquear temporalmente el stream normal
+        cameraTopic.unsubscribe();
+        cameraTopic2.unsubscribe();
+        
+        // Mostrar la imagen procesada
+        img.src = 'data:image/jpeg;base64,' + msg.data;
+        img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)'; // Efecto visual para el flash
+        
+        if (flashTimeout) clearTimeout(flashTimeout);
+        flashTimeout = setTimeout(function() {
+            img.style.filter = 'none';
+            cameraTopic.subscribe(handleCameraMessage);
+            cameraTopic2.subscribe(handleCameraMessage);
+        }, 1000);
+    });
+
     setTimeout(function () {
       addAlert('Panel conectado. Nav2 listo.', 'info');
       safeSetText(el.svcStatusText, 'Sistema listo.');
