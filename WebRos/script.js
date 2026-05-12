@@ -460,6 +460,39 @@ function connectToROS() {
       }
     })(0);
 
+    // Suscripción a la cámara
+    var cameraTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/image_raw/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+    
+    function handleCameraMessage(msg) {
+      var ph = document.querySelector('#cameraViewer .viewer-placeholder');
+      if (ph) ph.style.display = 'none';
+
+      var img = document.getElementById('cameraStream');
+      if (!img) {
+        img = document.createElement('img');
+        img.id = 'cameraStream';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+        document.getElementById('cameraViewer').appendChild(img);
+      }
+      img.src = 'data:image/jpeg;base64,' + msg.data;
+    }
+
+    cameraTopic.subscribe(handleCameraMessage);
+
+    // Fallback topic por si la cámara está bajo otro nombre común
+    var cameraTopic2 = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/image/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+    cameraTopic2.subscribe(handleCameraMessage);
+
     setTimeout(function () {
       addAlert('Panel conectado. Nav2 listo.', 'info');
       safeSetText(el.svcStatusText, 'Sistema listo.');
@@ -485,6 +518,13 @@ function connectToROS() {
     window.mapScene = null;
     window.lastMapMsg = null;
     window.mapImageData = null;
+    
+    // Resetear cámara
+    var cameraImg = document.getElementById('cameraStream');
+    if (cameraImg) cameraImg.remove();
+    var cameraPh = document.querySelector('#cameraViewer .viewer-placeholder');
+    if (cameraPh) cameraPh.style.display = 'block';
+
     setConnectionStatus('Desconectado', 'Conexión cerrada');
     el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
