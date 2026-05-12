@@ -191,6 +191,7 @@
     </div>
   </div>
 
+  <script src="db.js"></script>
   <script>
     const form       = document.getElementById('loginForm');
     const submitBtn  = document.getElementById('submitBtn');
@@ -235,7 +236,13 @@
       submitBtn.classList.remove('loading');
       submitBtn.disabled = false;
 
-      /* Demo: any credentials pass — swap with real auth if needed */
+      const user = window.VelarisDB.login(emailInput.value.trim(), pwInput.value);
+      if (!user) {
+        alertMsg.textContent = 'Credenciales incorrectas o usuario inactivo.';
+        alertMsg.classList.add('visible');
+        return;
+      }
+
       window.location.href = 'index.html';
     });
   </script>
