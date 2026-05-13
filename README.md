@@ -2,7 +2,7 @@
 
 ProyectoRobotica04 es un proyecto de robótica que integra simulación, navegación y una interfaz web en tiempo real para monitorizar y controlar un robot móvil en un entorno tipo almacén.
 
-## Memoria del proyecto
+Memoria del proyecto
 La memoria completa del proyecto se puede consultar aquí:
 [Ver memoria del proyecto](docs/MemoriaVelaris.pdf)
 
