@@ -84,6 +84,13 @@ ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
 # Guardar el mapa (generará mapa_warehouse.yaml y mapa_warehouse.pgm en el directorio actual)
 ros2 run nav2_map_server map_saver_cli -f mapa_warehouse
 
+# O
+
+ros2 run nav2_map_server map_saver_cli \
+  -f mapa_warehouse \
+  --ros-args \
+  -p map_subscribe_transient_local:=true
+
 
 ### Lanzar Nav2 ###
 
