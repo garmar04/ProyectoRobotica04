@@ -28,7 +28,7 @@ source $WORKSPACE_DIR/install/setup.bash
 export ROS_DOMAIN_ID=42
 export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
 export ROS_LOCALHOST_ONLY=0
-export TURTLEBOT3_MODEL=burger
+export TURTLEBOT3_MODEL=waffle
 export GZ_SIM_RESOURCE_PATH=$WORKSPACE_DIR/install/proy_andres_mundo/share/proy_andres_mundo/models:$WORKSPACE_DIR/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$WORKSPACE_DIR/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models
 
 # 3. LANZAMIENTO
@@ -65,11 +65,20 @@ sleep 3
 echo "[5/7] 📡 Mapeando tópicos Lidar e IMU..."
 ros2 run ros_gz_bridge parameter_bridge /scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan --ros-args -p use_sim_time:=true &
 ros2 run ros_gz_bridge parameter_bridge /imu@sensor_msgs/msg/Imu[gz.msgs.IMU --ros-args -p use_sim_time:=true &
+
+# Comprimir la imagen de la cámara para que la web pueda leerla rápido
+ros2 run image_transport republish raw compressed --ros-args --remap in:=/camera/image_raw --remap out/compressed:=/camera/image_raw/compressed &
+COMPRESS_PID=$!
 sleep 2
 
 echo "[6/7] 🔄 Levantando Nodo Puente Web..."
 ros2 run proy_andres_nav_ruta patrulla_bridge --ros-args -p use_sim_time:=true &
 PATROL_PID=$!
+sleep 2
+
+echo "[6.5/7] 📸 Levantando Nodo Procesador de Imagen..."
+ros2 run proy_andres_captacion procesador_imagen --ros-args -p use_sim_time:=true &
+IMG_PROC_PID=$!
 sleep 2
 
 echo "[7/7] 📺 Abriendo RViz..."
@@ -84,6 +93,6 @@ echo "🐢 Modo automático ahora hace giros suaves (0.35 rad/s)"
 echo "====================================================="
 echo "Presiona Ctrl+C para apagar todo."
 
-trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID \$POSE_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
+trap "echo '🛑 Apagando...'; kill -9 \$GAZEBO_PID \$NAV_PID \$BRIDGE_PID \$PATROL_PID \$RVIZ_PID \$VITE_PID \$POSE_PID \$COMPRESS_PID \$IMG_PROC_PID 2>/dev/null; pkill -9 ros_gz_bridge 2>/dev/null; ros2 daemon stop 2>/dev/null; exit 0" SIGINT SIGTERM
 
 wait

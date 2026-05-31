@@ -11,6 +11,26 @@ Uso:
 import rclpy
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from geometry_msgs.msg import PoseStamped
+from std_srvs.srv import Trigger
+
+
+def llamar_servicio_procesamiento(node):
+    """Llama al servicio de captación de imágenes."""
+    client = node.create_client(Trigger, 'capturar_y_procesar')
+    if not client.wait_for_service(timeout_sec=1.0):
+        print("Servicio de captación no disponible.")
+        return
+
+    req = Trigger.Request()
+    future = client.call_async(req)
+    rclpy.spin_until_future_complete(node, future, timeout_sec=2.0)
+    
+    if future.done():
+        res = future.result()
+        if res.success:
+            print(f"Imagen capturada: {res.message}")
+        else:
+            print(f"Fallo en captación: {res.message}")
 
 
 # Ruta de patrulla: lista de puntos (x, y) en el frame `map`.
@@ -41,37 +61,37 @@ def create_pose(x: float, y: float, w: float = 1.0) -> PoseStamped:
     pose.pose.orientation.w = float(w)
     return pose
 
-
 def main(args=None):
-    """Inicializa Nav2, envía la ruta de patrulla y muestra el resultado."""
+    """Inicializa Nav2, recorre los puntos uno a uno y procesa la imagen en cada parada."""
     rclpy.init(args=args)
     navigator = None
     try:
         navigator = BasicNavigator()
         navigator.waitUntilNav2Active()
 
-        print("Iniciando modo patrulla...")
+        print("=== VERSIÓN CON PROCESAMIENTO DE IMAGEN ACTIVA ===")
+        print("Iniciando modo patrulla secuencial...")
 
-        waypoints = [create_pose(x, y) for x, y in PATROL_WAYPOINTS]
+        for i, (x, y) in enumerate(PATROL_WAYPOINTS):
+            print(f"Navegando al waypoint {i}: ({x}, {y})...")
+            pose = create_pose(x, y)
+            navigator.goToPose(pose)
 
-        navigator.followWaypoints(waypoints)
+            while not navigator.isTaskComplete():
+                # Opcional: imprimir feedback de distancia
+                pass
 
-        while not navigator.isTaskComplete():
-            feedback = navigator.getFeedback()
-            if feedback:
-                print(f'Navegando al waypoint {feedback.current_waypoint} de {len(waypoints)}')
+            result = navigator.getResult()
+            if result == TaskResult.SUCCEEDED:
+                print(f"¡Llegada al waypoint {i}! Procesando imagen...")
+                llamar_servicio_procesamiento(navigator)
+            else:
+                print(f"No se pudo llegar al waypoint {i}. Saltando...")
 
-        result = navigator.getResult()
-        if result == TaskResult.SUCCEEDED:
-            print('¡Patrulla completada con éxito!')
-        elif result == TaskResult.CANCELED:
-            print('Patrulla cancelada por el usuario o por Nav2.')
-        elif result == TaskResult.FAILED:
-            print('Problema durante la patrulla: Nav2 ha reportado un fallo.')
-        else:
-            print(f'Resultado de patrulla desconocido: {result}')
+        print('¡Ruta de patrulla completada!')
 
     except KeyboardInterrupt:
+...
         print('\nInterrupción del usuario: cancelando patrulla...')
         if navigator is not None:
             try:

@@ -2,6 +2,12 @@
 
 ProyectoRobotica04 es un proyecto de robótica que integra simulación, navegación y una interfaz web en tiempo real para monitorizar y controlar un robot móvil en un entorno tipo almacén.
 
+Memoria del proyecto
+La memoria completa del proyecto se puede consultar aquí:
+[Ver memoria del proyecto](docs/MemoriaVelaris.pdf)
+
+
+
 Características principales
 - Interfaz web (WebRos) que detecta el estado de conexión y del robot, muestra alarmas, vídeo de cámara, minimapa y permite controles manuales y automáticos.
 - Simulación en Gazebo / ROS-GZ con un mundo de almacén y mapa (`mapa_warehouse.pgm` / `mapa_warehouse.yaml`).

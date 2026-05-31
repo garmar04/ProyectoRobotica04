@@ -23,7 +23,7 @@ def generate_launch_description():
 
     set_tb3_model = SetEnvironmentVariable(
         name='TURTLEBOT3_MODEL',
-        value='burger'
+        value='waffle'
     )
 
     # 2. Sim time
@@ -69,10 +69,10 @@ def generate_launch_description():
         name='lidar_static_tf',
         output='screen',
         arguments=[
-            '-0.032', '0.0', '0.171',
+            '-0.064', '0.0', '0.121',
             '0.0', '0.0', '0.0',      
             'base_link', 
-            'burger/base_scan/hls_lfcd_lds'
+            'waffle/base_scan/hls_lfcd_lds'
         ]
     )
 

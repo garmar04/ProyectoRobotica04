@@ -246,6 +246,7 @@
     </div>
   </div>
 
+  <script src="db.js"></script>
   <script>
     /* Password visibility toggles */
     function makeToggle(btnId, inputId, iconId) {
@@ -319,7 +320,24 @@
       btn.classList.add('loading');
       btn.disabled = true;
 
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 500));
+
+      try {
+        const nombreCompleto = (document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim()).trim();
+        window.VelarisDB.createUser({
+          nombre: nombreCompleto,
+          email: document.getElementById('email').value.trim(),
+          password: pwInput.value,
+        });
+        window.VelarisDB.login(document.getElementById('email').value.trim(), pwInput.value);
+      } catch (err) {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        const emailError = document.getElementById('emailError');
+        emailError.textContent = err.message || 'No se pudo crear la cuenta.';
+        showError('emailError', true);
+        return;
+      }
 
       btn.classList.remove('loading');
       document.getElementById('alertSuccess').classList.add('visible');

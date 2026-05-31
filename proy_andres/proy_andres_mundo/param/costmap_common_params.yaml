@@ -33,4 +33,5 @@ inflation_layer:
 
 static_layer:
   enabled:              true
-  
+  track_unknown_space:  true
+

@@ -45,17 +45,151 @@ const el = {
   lastCommand: document.getElementById('lastCommand'),
   serviceStatus: document.getElementById('serviceStatus'),
   svcStatusText: document.getElementById('svcStatusText'),
-  alertsList: document.getElementById('alertsList'),
-  alertsCount: document.getElementById('alertsCount'),
-  clearAlertsBtn: document.getElementById('clearAlertsBtn'),
   modeToggle: document.getElementById('modeToggle'),
   modeNameText: document.getElementById('modeNameText'),
   modeDescText: document.getElementById('modeDescText'),
   currentModeText: document.getElementById('currentModeText'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  dbUserName: document.getElementById('dbUserName'),
+  dbUserEmail: document.getElementById('dbUserEmail'),
+  robotSelect: document.getElementById('robotSelect'),
+  dbRobotState: document.getElementById('dbRobotState'),
+  statRobots: document.getElementById('statRobots'),
+  statAlertas: document.getElementById('statAlertas'),
+  statDetecciones: document.getElementById('statDetecciones'),
+  statPatrullas: document.getElementById('statPatrullas'),
+  dbAlertsBody: document.getElementById('dbAlertsBody'),
 };
 
 function safeSetText(el, text) {
   if (el && el.textContent !== undefined) el.textContent = text;
+}
+
+/* ── Gestión de datos local ─────────────────────────────── */
+function getActiveRobot() {
+  return window.VelarisDB ? window.VelarisDB.getSelectedRobot() : null;
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  try { return new Date(value).toLocaleString('es-ES'); }
+  catch { return value; }
+}
+
+function renderDatabasePanel() {
+  if (!window.VelarisDB) return;
+
+  const data = window.VelarisDB.getDataForCurrentUser();
+  const user = data.user;
+
+  if (!user) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  safeSetText(el.dbUserName, user.nombre || 'Usuario cliente');
+  safeSetText(el.dbUserEmail, user.email || '-');
+
+  if (el.robotSelect) {
+    const selected = window.VelarisDB.getSelectedRobot();
+    el.robotSelect.innerHTML = '';
+    data.robots.forEach(robot => {
+      const option = document.createElement('option');
+      option.value = robot.id_robot;
+      option.textContent = robot.nombre + ' · ' + robot.modelo;
+      if (selected && selected.id_robot === robot.id_robot) option.selected = true;
+      el.robotSelect.appendChild(option);
+    });
+  }
+
+  const robot = getActiveRobot();
+  if (robot) {
+    safeSetText(el.dbRobotState, robot.estado + ' · ' + robot.modo_operacion +
+      ' · x=' + Number(robot.ubicacion_actual_x || 0).toFixed(2) +
+      ', y=' + Number(robot.ubicacion_actual_y || 0).toFixed(2));
+  } else {
+    safeSetText(el.dbRobotState, 'Sin robots asociados');
+  }
+
+  safeSetText(el.statRobots, data.robots.length);
+  safeSetText(el.statAlertas, data.alertas.length);
+  safeSetText(el.statDetecciones, data.detecciones.length);
+  safeSetText(el.statPatrullas, data.patrullas.length);
+
+  if (el.dbAlertsBody) {
+    const pendientes = data.alertas.filter(a => a.estado_alerta === 'pendiente').sort((a, b) => b.id_alerta - a.id_alerta);
+    if (pendientes.length === 0) {
+      el.dbAlertsBody.innerHTML = '<tr><td colspan="6">Sin alertas pendientes</td></tr>';
+    } else {
+      el.dbAlertsBody.innerHTML = pendientes.map(a => (
+        '<tr>' +
+        '<td>#' + a.id_alerta + '</td>' +
+        '<td>' + (a.tipo_alerta || '-') + '</td>' +
+        '<td>' + (a.nivel || '-') + '</td>' +
+        '<td>' + (a.estado_alerta || '-') + '</td>' +
+        '<td>' + formatDate(a.fecha_hora) + '</td>' +
+        '<td><button class="btn btn-small" onclick="window.resolveAlert(' + a.id_alerta + ')">Resolver</button></td>' +
+        '</tr>'
+      )).join('');
+    }
+  }
+
+  const dbHistoryBody = document.getElementById('dbHistoryBody');
+  if (dbHistoryBody) {
+    const resueltas = data.alertas.filter(a => a.estado_alerta === 'resuelta').sort((a, b) => b.id_alerta - a.id_alerta);
+    if (resueltas.length === 0) {
+      dbHistoryBody.innerHTML = '<tr><td colspan="5">Sin historial de alertas</td></tr>';
+    } else {
+      dbHistoryBody.innerHTML = resueltas.map(a => (
+        '<tr>' +
+        '<td>#' + a.id_alerta + '</td>' +
+        '<td>' + (a.tipo_alerta || '-') + '</td>' +
+        '<td>' + (a.nivel || '-') + '</td>' +
+        '<td>' + (a.estado_alerta || '-') + '</td>' +
+        '<td>' + formatDate(a.fecha_hora) + '</td>' +
+        '</tr>'
+      )).join('');
+    }
+  }
+}
+
+window.resolveAlert = function (id_alerta) {
+  if (window.VelarisDB && window.VelarisDB.updateAlertState) {
+    window.VelarisDB.updateAlertState(id_alerta, 'resuelta');
+    renderDatabasePanel();
+  }
+};
+
+function persistAlertToDB(message, severity) {
+  if (!window.VelarisDB) return;
+  const robot = getActiveRobot();
+  if (!robot) return;
+
+  const pos = currentRobotPos || { x: 0, y: 0 };
+  const isPerson = /persona|person/i.test(message);
+  const isDoor = /puerta|door/i.test(message);
+  const tipo = isPerson ? 'persona_detectada' : (isDoor ? 'puerta_abierta' : 'evento_seguridad');
+
+  const deteccion = window.VelarisDB.createDetection({
+    id_robot: robot.id_robot,
+    tipo_deteccion: isPerson ? 'persona' : (isDoor ? 'puerta' : 'evento'),
+    resultado: message,
+    confianza: 1,
+    coord_x: pos.x || 0,
+    coord_y: pos.y || 0,
+  });
+
+  window.VelarisDB.createAlert({
+    id_robot: robot.id_robot,
+    id_deteccion: deteccion.id_deteccion,
+    tipo_alerta: tipo,
+    descripcion: message,
+    nivel: severity === 'critical' ? 'alta' : 'media',
+    coord_x: pos.x || 0,
+    coord_y: pos.y || 0,
+  });
+
+  renderDatabasePanel();
 }
 
 /* ── Clock ──────────────────────────────────────────────── */
@@ -100,8 +234,8 @@ function insertOrUpdateAlert(newAlert) {
   }
 
   // Identificar duplicados basados en tipo_alerta y ubicación (orden, coord_x, coord_y) en estado "pendiente"
-  const duplicateIndex = alerts.findIndex(a => 
-    a.estado_alerta === 'pendiente' && 
+  const duplicateIndex = alerts.findIndex(a =>
+    a.estado_alerta === 'pendiente' &&
     a.tipo_alerta === newAlert.tipo_alerta &&
     Number(a.orden) === Number(newAlert.orden) &&
     Number(a.coord_x) === Number(newAlert.coord_x) &&
@@ -164,11 +298,11 @@ function renderAlerts() {
   pendingAlerts.forEach(alert => {
     const item = document.createElement('div');
     item.className = 'alert-item';
-    
+
     // Asignar clase crítica si corresponde
-    const isCritical = alert.severity === 'critical' || 
-                       /error|fallo|critical/i.test(alert.tipo_alerta) || 
-                       /error|fallo|critical/i.test(alert.descripcion);
+    const isCritical = alert.severity === 'critical' ||
+      /error|fallo|critical/i.test(alert.tipo_alerta) ||
+      /error|fallo|critical/i.test(alert.descripcion);
     if (isCritical) {
       item.classList.add('critical');
     }
@@ -206,7 +340,7 @@ function renderAlerts() {
 
     // Vincular botón de resolución
     const btn = item.querySelector('.btn-resolve');
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function () {
       resolveAlert(alert.id_alerta);
     });
 
@@ -246,7 +380,7 @@ function resolveAlert(id) {
 
 function addAlert(message, severity) {
   severity = severity || 'info';
-  
+
   const alertData = {
     id_alerta: Date.now().toString() + Math.random().toString(36).substring(2, 5),
     tipo_alerta: severity === 'critical' || /error|fallo/i.test(message) ? "Fallo Crítico" : "Notificación",
@@ -280,6 +414,20 @@ function connectToROS() {
   ros.on('connection', function () {
     isConnected = true;
     setConnectionStatus('Conectado', 'Conexión establecida');
+    const activeRobot = getActiveRobot();
+    if (activeRobot && window.VelarisDB) {
+      window.VelarisDB.updateRobot(activeRobot.id_robot, {
+        estado: 'Conectado',
+        modo_operacion: currentMode,
+        ultima_conexion: new Date().toISOString(),
+      });
+      window.VelarisDB.createConnection({
+        id_robot: activeRobot.id_robot,
+        url_websocket: url,
+        estado: 'Conectada',
+      });
+      renderDatabasePanel();
+    }
     el.connectBtn.disabled = true;
     el.disconnectBtn.disabled = false;
     safeSetText(el.svcStatusText, 'ROS2 conectado. Inicializando tópicos...');
@@ -311,7 +459,7 @@ function connectToROS() {
         if (alertData.orden === undefined) alertData.orden = 0;
         if (alertData.coord_x === undefined) alertData.coord_x = 0;
         if (alertData.coord_y === undefined) alertData.coord_y = 0;
-        
+
         insertOrUpdateAlert(alertData);
       } else {
         var sev = /critical/i.test(text) ? 'critical' : 'info';
@@ -382,17 +530,23 @@ function connectToROS() {
       currentRobotPos.y = pose.y;
       currentRobotPos.theta = theta;
 
+      const activeRobotForOdom = getActiveRobot();
+      if (activeRobotForOdom && window.VelarisDB) {
+        window.VelarisDB.updateRobotPosition(activeRobotForOdom.id_robot, pose.x, pose.y);
+        // No renderizamos en cada frame para evitar recargar el panel continuamente.
+      }
+
       // Actualizar el marcador en el canvas del mapa usando el ImageData cacheado.
       // El mapa ya fue volteado verticalmente al cachearlo, asi que la formula
       // de coordenadas es la estandar ROS->canvas (Y invertido respecto al mundo ROS).
       var fallbackCanvas = document.getElementById('map');
       if (fallbackCanvas && window.mapImageData && window.lastMapMsg) {
         try {
-          var info   = window.lastMapMsg.info;
-          var ctx    = fallbackCanvas.getContext('2d');
+          var info = window.lastMapMsg.info;
+          var ctx = fallbackCanvas.getContext('2d');
           var origin = info.origin.position;
-          var res    = info.resolution;
-          var mapH   = info.height;
+          var res = info.resolution;
+          var mapH = info.height;
 
           // 1. Restaurar la imagen del mapa sin marcador
           ctx.putImageData(window.mapImageData, 0, 0);
@@ -466,7 +620,7 @@ function connectToROS() {
                 var tmp = new Uint8ClampedArray(rowBytes);
                 var d = imgData.data;
                 for (var row = 0; row < Math.floor(h / 2); row++) {
-                  var top    = row * rowBytes;
+                  var top = row * rowBytes;
                   var bottom = (h - 1 - row) * rowBytes;
                   tmp.set(d.subarray(top, top + rowBytes));
                   d.copyWithin(top, bottom, bottom + rowBytes);
@@ -479,10 +633,10 @@ function connectToROS() {
 
                 // 4. Dibujar el robot encima si ya tenemos posicion
                 if (currentRobotPos.x !== 0 || currentRobotPos.y !== 0) {
-                  var info   = msg.info;
+                  var info = msg.info;
                   var origin = info.origin.position;
-                  var res    = info.resolution;
-                  var mapH   = info.height;
+                  var res = info.resolution;
+                  var mapH = info.height;
                   var px = (currentRobotPos.x - origin.x) / res;
                   var py = mapH - (currentRobotPos.y - origin.y) / res;
                   ctx.beginPath();
@@ -503,6 +657,86 @@ function connectToROS() {
         if (typeIndex + 1 < 2) trySubscribeMap(typeIndex + 1);
       }
     })(0);
+
+    // Suscripción a la cámara
+    var cameraTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/image_raw/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+
+    function handleCameraMessage(msg) {
+      var ph = document.querySelector('#cameraViewer .viewer-placeholder');
+      if (ph) ph.style.display = 'none';
+
+      var img = document.getElementById('cameraStream');
+      if (!img) {
+        img = document.createElement('img');
+        img.id = 'cameraStream';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+        document.getElementById('cameraViewer').appendChild(img);
+      }
+      img.src = 'data:image/jpeg;base64,' + msg.data;
+    }
+
+    cameraTopic.subscribe(handleCameraMessage);
+
+    // Fallback topic por si la cámara está bajo otro nombre común
+    var cameraTopic2 = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/image/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+    cameraTopic2.subscribe(handleCameraMessage);
+
+    // Flash de imagen procesada (OpenCV)
+    var processedTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/camera/processed/compressed',
+      messageType: 'sensor_msgs/msg/CompressedImage'
+    });
+
+    let flashTimeout = null;
+    processedTopic.subscribe(function (msg) {
+      var img = document.getElementById('cameraStream');
+      if (!img) return;
+
+      // Bloquear temporalmente el stream normal
+      cameraTopic.unsubscribe();
+      cameraTopic2.unsubscribe();
+
+      // Mostrar la imagen procesada
+      var imageBase64 = 'data:image/jpeg;base64,' + msg.data;
+      img.src = imageBase64;
+      img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)'; // Efecto visual para el flash
+
+      if (flashTimeout) clearTimeout(flashTimeout);
+      flashTimeout = setTimeout(function () {
+        img.style.filter = 'none';
+        cameraTopic.subscribe(handleCameraMessage);
+        cameraTopic2.subscribe(handleCameraMessage);
+      }, 1000);
+
+      // --- GENERAR ALERTA DE IMAGEN (Punto de Control) ---
+      if (window.VelarisDB) {
+        const robot = getActiveRobot();
+        if (robot) {
+          const pos = currentRobotPos || { x: 0, y: 0 };
+          window.VelarisDB.createAlert({
+            id_robot: robot.id_robot,
+            tipo_alerta: 'imagen',
+            descripcion: 'Control rutinario completado en el punto de patrulla actual.',
+            nivel: 'Baja', // Informativa
+            coord_x: pos.x || 0,
+            coord_y: pos.y || 0,
+            ruta_imagen: imageBase64
+          });
+          renderDatabasePanel();
+        }
+      }
+    });
 
     setTimeout(function () {
       addAlert('Panel conectado. Nav2 listo.', 'info');
@@ -529,6 +763,13 @@ function connectToROS() {
     window.mapScene = null;
     window.lastMapMsg = null;
     window.mapImageData = null;
+
+    // Resetear cámara
+    var cameraImg = document.getElementById('cameraStream');
+    if (cameraImg) cameraImg.remove();
+    var cameraPh = document.querySelector('#cameraViewer .viewer-placeholder');
+    if (cameraPh) cameraPh.style.display = 'block';
+
     setConnectionStatus('Desconectado', 'Conexión cerrada');
     el.connectBtn.disabled = false;
     el.disconnectBtn.disabled = true;
@@ -681,6 +922,13 @@ document.addEventListener('keyup', function (e) {
 /* ── Mode switching ─────────────────────────────────────── */
 function setOperationMode(mode) {
   currentMode = mode;
+  const activeRobotForMode = getActiveRobot();
+  if (activeRobotForMode && window.VelarisDB) {
+    window.VelarisDB.updateRobot(activeRobotForMode.id_robot, {
+      modo_operacion: mode === 'auto' ? 'automatico' : 'manual',
+    });
+    renderDatabasePanel();
+  }
 
   if (mode === 'manual') {
     if (el.modeToggle) el.modeToggle.checked = false;
@@ -734,12 +982,25 @@ function iniciarPatrulla() {
 /* ── Event listeners ────────────────────────────────────── */
 el.connectBtn.addEventListener('click', connectToROS);
 el.disconnectBtn.addEventListener('click', disconnectFromROS);
-el.clearAlertsBtn.addEventListener('click', clearAlerts);
 el.modeToggle.addEventListener('change', function (e) {
   setOperationMode(e.target.checked ? 'auto' : 'manual');
 });
 
+if (el.logoutBtn && window.VelarisDB) {
+  el.logoutBtn.addEventListener('click', function () {
+    window.VelarisDB.logout();
+  });
+}
+
+if (el.robotSelect && window.VelarisDB) {
+  el.robotSelect.addEventListener('change', function (e) {
+    window.VelarisDB.setSelectedRobot(Number(e.target.value));
+    renderDatabasePanel();
+  });
+}
+
 /* ── Init ───────────────────────────────────────────────── */
+renderDatabasePanel();
 setOperationMode('manual');
 setControlsEnabled(true);
 renderAlerts();
