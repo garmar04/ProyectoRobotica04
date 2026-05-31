@@ -20,10 +20,9 @@ PATROL_POINTS = [(-7.0, 4.0), (-7.0, -4.0), (0.5, -7.0), (7.0, 4.0)]
 class PatrolBridge(Node):
     def __init__(self):
         super().__init__('patrol_bridge_node')
-        # Sincronizar con Gazebo
-        self.set_parameters([
-            rclpy.parameter.Parameter('use_sim_time', rclpy.Parameter.Type.BOOL, True)
-        ])
+        # No forzamos `use_sim_time`: se respeta el valor recibido por línea de
+        # comandos (`-p use_sim_time:=true` en Gazebo, `:=false` en robot real),
+        # de modo que el mismo nodo sirve para simulación y robot físico.
         self.srv = self.create_service(Trigger, '/start_patrol', self.patrol_callback)
         self.get_logger().info('Servicio Puente /start_patrol listo.')
         # Cliente para el procesador de imagen

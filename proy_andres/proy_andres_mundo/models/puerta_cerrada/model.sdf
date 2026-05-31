@@ -1,0 +1,194 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <!--
+    PUERTA CERRADA
+    Origen del modelo: centro del hueco, a ras de suelo (z=0).
+    El hueco libre es ~1.0 m de ancho y 2.04 m de alto.
+    Eje de bisagra vertical en x=-0.5 (jamba izquierda).
+    Hoja CERRADA -> yaw = 0  (centro de hoja en x=-0.02, y=0).
+  -->
+  <model name="puerta_cerrada">
+    <static>true</static>
+
+    <!-- ============ MARCO (jambas + dintel) ============ -->
+    <link name="marco">
+      <pose>0 0 0 0 0 0</pose>
+
+      <!-- Jamba izquierda -->
+      <visual name="jamba_izq_vis">
+        <pose>-0.54 0 1.05 0 0 0</pose>
+        <geometry><box><size>0.10 0.22 2.10</size></box></geometry>
+        <material>
+          <ambient>0.34 0.36 0.40 1</ambient>
+          <diffuse>0.55 0.58 0.62 1</diffuse>
+          <specular>0.45 0.45 0.45 1</specular>
+          <pbr><metal><metalness>0.85</metalness><roughness>0.40</roughness></metal></pbr>
+        </material>
+      </visual>
+      <collision name="jamba_izq_col">
+        <pose>-0.54 0 1.05 0 0 0</pose>
+        <geometry><box><size>0.10 0.22 2.10</size></box></geometry>
+      </collision>
+
+      <!-- Jamba derecha -->
+      <visual name="jamba_der_vis">
+        <pose>0.54 0 1.05 0 0 0</pose>
+        <geometry><box><size>0.10 0.22 2.10</size></box></geometry>
+        <material>
+          <ambient>0.34 0.36 0.40 1</ambient>
+          <diffuse>0.55 0.58 0.62 1</diffuse>
+          <specular>0.45 0.45 0.45 1</specular>
+          <pbr><metal><metalness>0.85</metalness><roughness>0.40</roughness></metal></pbr>
+        </material>
+      </visual>
+      <collision name="jamba_der_col">
+        <pose>0.54 0 1.05 0 0 0</pose>
+        <geometry><box><size>0.10 0.22 2.10</size></box></geometry>
+      </collision>
+
+      <!-- Dintel (parte superior) -->
+      <visual name="dintel_vis">
+        <pose>0 0 2.16 0 0 0</pose>
+        <geometry><box><size>1.18 0.22 0.12</size></box></geometry>
+        <material>
+          <ambient>0.34 0.36 0.40 1</ambient>
+          <diffuse>0.55 0.58 0.62 1</diffuse>
+          <specular>0.45 0.45 0.45 1</specular>
+          <pbr><metal><metalness>0.85</metalness><roughness>0.40</roughness></metal></pbr>
+        </material>
+      </visual>
+      <collision name="dintel_col">
+        <pose>0 0 2.16 0 0 0</pose>
+        <geometry><box><size>1.18 0.22 0.12</size></box></geometry>
+      </collision>
+
+      <!-- Bisagras (lado izquierdo, eje x=-0.5) -->
+      <visual name="bisagra_inf">
+        <pose>-0.50 0.11 0.45 0 0 0</pose>
+        <geometry><cylinder><radius>0.025</radius><length>0.14</length></cylinder></geometry>
+        <material>
+          <ambient>0.05 0.05 0.06 1</ambient>
+          <diffuse>0.12 0.12 0.14 1</diffuse>
+          <specular>0.6 0.6 0.6 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.25</roughness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="bisagra_sup">
+        <pose>-0.50 0.11 1.65 0 0 0</pose>
+        <geometry><cylinder><radius>0.025</radius><length>0.14</length></cylinder></geometry>
+        <material>
+          <ambient>0.05 0.05 0.06 1</ambient>
+          <diffuse>0.12 0.12 0.14 1</diffuse>
+          <specular>0.6 0.6 0.6 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.25</roughness></metal></pbr>
+        </material>
+      </visual>
+    </link>
+
+    <!-- ============ HOJA (puerta) ============ -->
+    <!-- CERRADA: pose centro = (-0.02, 0), yaw = 0 -->
+    <link name="hoja">
+      <pose>-0.02 0 0 0 0 0</pose>
+
+      <!-- Cuerpo principal de la hoja -->
+      <visual name="hoja_vis">
+        <pose>0 0 1.02 0 0 0</pose>
+        <geometry><box><size>0.94 0.05 2.04</size></box></geometry>
+        <material>
+          <ambient>0.10 0.16 0.24 1</ambient>
+          <diffuse>0.20 0.34 0.50 1</diffuse>
+          <specular>0.25 0.25 0.25 1</specular>
+          <pbr><metal><metalness>0.55</metalness><roughness>0.55</roughness></metal></pbr>
+        </material>
+      </visual>
+      <collision name="hoja_col">
+        <pose>0 0 1.02 0 0 0</pose>
+        <geometry><box><size>0.94 0.05 2.04</size></box></geometry>
+      </collision>
+
+      <!-- Panel decorativo superior (relieve, cara +Y) -->
+      <visual name="panel_sup_a">
+        <pose>0 0.028 1.45 0 0 0</pose>
+        <geometry><box><size>0.66 0.012 0.62</size></box></geometry>
+        <material>
+          <ambient>0.07 0.12 0.18 1</ambient>
+          <diffuse>0.15 0.26 0.40 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+      <!-- Panel decorativo inferior (relieve, cara +Y) -->
+      <visual name="panel_inf_a">
+        <pose>0 0.028 0.60 0 0 0</pose>
+        <geometry><box><size>0.66 0.012 0.62</size></box></geometry>
+        <material>
+          <ambient>0.07 0.12 0.18 1</ambient>
+          <diffuse>0.15 0.26 0.40 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+      <!-- Panel decorativo superior (relieve, cara -Y) -->
+      <visual name="panel_sup_b">
+        <pose>0 -0.028 1.45 0 0 0</pose>
+        <geometry><box><size>0.66 0.012 0.62</size></box></geometry>
+        <material>
+          <ambient>0.07 0.12 0.18 1</ambient>
+          <diffuse>0.15 0.26 0.40 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+      <!-- Panel decorativo inferior (relieve, cara -Y) -->
+      <visual name="panel_inf_b">
+        <pose>0 -0.028 0.60 0 0 0</pose>
+        <geometry><box><size>0.66 0.012 0.62</size></box></geometry>
+        <material>
+          <ambient>0.07 0.12 0.18 1</ambient>
+          <diffuse>0.15 0.26 0.40 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+
+      <!-- Manilla tipo palanca (lado opuesto a bisagra, x≈+0.38) cara +Y -->
+      <visual name="manilla_roseta_a">
+        <pose>0.38 0.04 1.02 1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.035</radius><length>0.02</length></cylinder></geometry>
+        <material>
+          <ambient>0.06 0.06 0.06 1</ambient>
+          <diffuse>0.15 0.15 0.16 1</diffuse>
+          <specular>0.7 0.7 0.7 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.20</roughness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="manilla_palanca_a">
+        <pose>0.32 0.07 1.02 0 0 0</pose>
+        <geometry><box><size>0.12 0.025 0.025</size></box></geometry>
+        <material>
+          <ambient>0.06 0.06 0.06 1</ambient>
+          <diffuse>0.15 0.15 0.16 1</diffuse>
+          <specular>0.7 0.7 0.7 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.20</roughness></metal></pbr>
+        </material>
+      </visual>
+      <!-- Manilla cara -Y -->
+      <visual name="manilla_roseta_b">
+        <pose>0.38 -0.04 1.02 1.5708 0 0</pose>
+        <geometry><cylinder><radius>0.035</radius><length>0.02</length></cylinder></geometry>
+        <material>
+          <ambient>0.06 0.06 0.06 1</ambient>
+          <diffuse>0.15 0.15 0.16 1</diffuse>
+          <specular>0.7 0.7 0.7 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.20</roughness></metal></pbr>
+        </material>
+      </visual>
+      <visual name="manilla_palanca_b">
+        <pose>0.32 -0.07 1.02 0 0 0</pose>
+        <geometry><box><size>0.12 0.025 0.025</size></box></geometry>
+        <material>
+          <ambient>0.06 0.06 0.06 1</ambient>
+          <diffuse>0.15 0.15 0.16 1</diffuse>
+          <specular>0.7 0.7 0.7 1</specular>
+          <pbr><metal><metalness>0.95</metalness><roughness>0.20</roughness></metal></pbr>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

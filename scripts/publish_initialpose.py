@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
+"""Publica una pose inicial para AMCL.
+
+Uso:
+    python3 publish_initialpose.py [x] [y] [yaw]
+
+Sin argumentos publica la pose (0, 0, 0), que es la usada en simulación.
+Para el robot real puede indicarse la pose donde arranca físicamente el robot
+respecto al mapa `mapa_warehouse_real.yaml` (origen distinto al de Gazebo).
+"""
 import sys
+import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -7,8 +17,11 @@ from nav_msgs.msg import Odometry
 
 
 class InitialPosePublisher(Node):
-    def __init__(self):
+    def __init__(self, x=0.0, y=0.0, yaw=0.0):
         super().__init__('initialpose_publisher')
+        self.init_x = float(x)
+        self.init_y = float(y)
+        self.init_yaw = float(yaw)
         # Declare use_sim_time so the parameter exists for this node
         try:
             self.declare_parameter('use_sim_time', True)
@@ -51,11 +64,14 @@ class InitialPosePublisher(Node):
         msg = PoseWithCovarianceStamped()
         msg.header.stamp = odom_stamp
         msg.header.frame_id = 'map'
-        msg.pose.pose.position.x = 0.0
-        msg.pose.pose.position.y = 0.0
-        msg.pose.pose.orientation.w = 1.0
+        msg.pose.pose.position.x = self.init_x
+        msg.pose.pose.position.y = self.init_y
+        msg.pose.pose.orientation.z = math.sin(self.init_yaw / 2.0)
+        msg.pose.pose.orientation.w = math.cos(self.init_yaw / 2.0)
         self.pub.publish(msg)
-        self.get_logger().info('Published initial pose using latest /odom timestamp')
+        self.get_logger().info(
+            f'Published initial pose ({self.init_x:.2f}, {self.init_y:.2f}, '
+            f'{self.init_yaw:.2f} rad) using latest /odom timestamp')
         self.published = True
         try:
             self.timer.cancel()
@@ -74,9 +90,15 @@ def main():
         print('rclpy.init() failed:', e, file=sys.stderr)
         return 1
 
+    # Pose opcional por línea de comandos (x y yaw); por defecto (0, 0, 0).
+    cli_args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    x = float(cli_args[0]) if len(cli_args) >= 1 else 0.0
+    y = float(cli_args[1]) if len(cli_args) >= 2 else 0.0
+    yaw = float(cli_args[2]) if len(cli_args) >= 3 else 0.0
+
     node = None
     try:
-        node = InitialPosePublisher()
+        node = InitialPosePublisher(x, y, yaw)
         # Spin until we've published the pose or until shutdown
         while rclpy.ok() and not node.published:
             rclpy.spin_once(node, timeout_sec=0.5)

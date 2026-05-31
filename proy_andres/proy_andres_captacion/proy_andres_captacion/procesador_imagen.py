@@ -10,13 +10,19 @@ class ProcesadorImagenNode(Node):
     def __init__(self):
         super().__init__('procesador_imagen')
         self.bridge = CvBridge()
-        
+
+        # Tópico de la cámara configurable: en Gazebo es `/camera/image_raw`,
+        # en el robot real (image_tools cam2image) suele ser `/image`.
+        self.declare_parameter('camera_topic', '/camera/image_raw')
+        camera_topic = self.get_parameter('camera_topic').get_parameter_value().string_value
+
         # Suscriptor a la cámara
         self.subscription = self.create_subscription(
             Image,
-            '/camera/image_raw',
+            camera_topic,
             self.listener_callback,
             10)
+        self.get_logger().info(f'Suscrito a la cámara en: {camera_topic}')
         
         # Publicador para el "flash" en la web
         self.flash_pub = self.create_publisher(

@@ -1,105 +1,371 @@
-### Instalación de dependencias (nada más clonar el repositorio) ###
+########################################################################
+##  PROYECTO ROBÓTICA 04 — GUÍA DE REFERENCIA RÁPIDA
+##  TurtleBot3 Waffle (sim) / Burger (robot real)  |  ROS 2 Jazzy
+########################################################################
 
-# Si estás en ArchLinux:
 
+########################################################################
+## 0. ESTRUCTURA DEL PROYECTO
+########################################################################
+
+# Paquetes ROS 2 (en proy_andres/):
+#   proy_andres_mundo       → mundo Gazebo, launch, control_manual (C++)
+#   proy_andres_nav_ruta    → patrulla_bridge (web↔Nav2), patrullar
+#   proy_andres_nav_punto   → ir_a_punto, web_teleop_service
+#   proy_andres_captacion   → procesador_imagen (cámara + OpenCV)
+#   proy_andres_interface   → servicio personalizado MyMoveMsg.srv
+#
+# Scripts de arranque (raíz del workspace):
+#   start.sh                → arranca TODO en Gazebo (simulación)
+#   start_real.sh           → arranca TODO con el robot real vía WiFi
+#
+# Mapas:
+#   mapa_warehouse.yaml/.pgm        → mapa de simulación (res 0.05 m/px)
+#   mapa_warehouse_real.yaml/.pgm   → mapa del robot real (res 0.015 m/px)
+#
+# Web (WebRos/):
+#   Vite + React + rosbridge_suite  → http://localhost:5173
+#   Tópicos que consume la web:
+#     /camera/image_raw/compressed  → imagen en vivo de la cámara
+#     /camera/processed/compressed  → imagen procesada (flash en patrulla)
+#     /start_patrol  (servicio)     → inicia la patrulla automática
+#     /movement      (servicio)     → teleop manual desde la web
+#     /cmd_vel       (topic)        → velocidad (manual y automático)
+
+
+########################################################################
+## 1. INSTALACIÓN (solo la primera vez tras clonar)
+########################################################################
+
+# Si estás en ArchLinux con distrobox:
 distrobox enter ros_jazzy
 bash
 conda deactivate
 
-# Instalar automáticamente cualquier paquete de ROS 2 que el proyecto necesite y no esté en tu sistema
 cd ~/Escritorio/GTI/ProyectoRobotica04
 source /opt/ros/jazzy/setup.bash
+
+# Instalar dependencias ROS 2 que falten en el sistema:
 sudo rosdep init
 rosdep update
 rosdep install -i --from-path src --rosdistro jazzy -y
 
-# Compilar espacio de trabajo por primera vez
+# Instalar dependencias de la web:
+cd WebRos && npm install && cd ..
+
+# Compilar el workspace completo:
 colcon build
 
 
-### Cada terminal nueva ###
-
+########################################################################
+## 2. CONFIGURACIÓN DEL ENTORNO (cada terminal nueva)
+########################################################################
 
 cd ~/Escritorio/GTI/ProyectoRobotica04
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
-# Identificador de dominio (para que los nodos se vean entre sí)
-export ROS_DOMAIN_ID=0
-ROS_LOCALHOST_ONLY=0
+# --- SIMULACIÓN ---
+export ROS_DOMAIN_ID=42
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+export ROS_LOCALHOST_ONLY=0
+export TURTLEBOT3_MODEL=waffle
 
-# Variables del robot
+# --- ROBOT REAL ---
+# (sustituye X por el número de equipo, que debe coincidir con el robot)
+export ROS_DOMAIN_ID=X
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET   # ← imprescindible para WiFi
+export ROS_LOCALHOST_ONLY=0
 export TURTLEBOT3_MODEL=burger
 
-# Variables de rutas para Gazebo Moderno (Modelos y texturas)
-echo 'export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$PWD/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell/materials/textures:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models/workcell_bin/materials/textures' >> ~/.bashrc
+# Rutas de modelos para Gazebo (solo simulación, añadir al ~/.bashrc una vez):
+echo 'export GZ_SIM_RESOURCE_PATH=$PWD/install/proy_andres_mundo/share/proy_andres_mundo/models:$PWD/install/proy_andres_mundo/share/proy_andres_mundo/worlds:$PWD/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models' >> ~/.bashrc
 
-# Modo Compatibilidad Gráfica (Descomentar si Gazebo crashea al abrir):
+# Compatibilidad gráfica (descomentar si Gazebo crashea):
+# echo 'export LIBGL_ALWAYS_SOFTWARE=1' >> ~/.bashrc
 # echo 'export __GLX_VENDOR_LIBRARY_NAME=mesa' >> ~/.bashrc
 # echo 'export MESA_LOADER_DRIVER_OVERRIDE=zink' >> ~/.bashrc
-# echo 'export LIBGL_ALWAYS_SOFTWARE=1' >> ~/.bashrc
 
-# (Opcional) Si usas gráfica NVIDIA en tu portátil, usa estas variables en lugar de las de Mesa:
+# GPU NVIDIA (alternativa a Mesa):
 # export __NV_PRIME_RENDER_OFFLOAD=1
 # export __GLX_VENDOR_LIBRARY_NAME=nvidia
 # export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
 
 
-### Terminal de Gazebo ###
+########################################################################
+## 3. ARRANQUE RÁPIDO (forma recomendada)
+########################################################################
+
+# ── SIMULACIÓN ──────────────────────────────────────────────────────
+chmod +x start.sh
+./start.sh
+# Abre: Gazebo + Nav2 + Rosbridge + Web + RViz + nodos de patrulla e imagen
+# Web: http://localhost:5173
+
+# ── ROBOT REAL ──────────────────────────────────────────────────────
+# ANTES de lanzar, edita start_real.sh y ajusta:
+#   ROBOT_IP="192.168.0.XX"   ← IP del robot (ver doc del grupo)
+#   ROBOT_DOMAIN_ID=X         ← número de equipo (igual que en el robot)
+#   INITIAL_POSE="x y yaw"    ← pose inicial del robot en el mapa real
+#   LAUNCH_ROBOT_BRINGUP=false/true
+
+chmod +x start_real.sh
+./start_real.sh
+# Abre: Nav2 (mapa real) + Rosbridge + Web + RViz + nodos de patrulla e imagen
+# Web: http://localhost:5173
 
 
-# 1. (Opcional) Limpiar procesos fantasma si Gazebo se cerró mal en la sesión anterior
-pkill -9 gz; pkill -9 ruby; pkill -9 gazebo
+########################################################################
+## 4. ROBOT REAL — CONFIGURACIÓN PREVIA (una sola vez por sesión)
+########################################################################
 
-# 2. Compilar (Usa el select para que sea rápido, quita el select si has tocado otros paquetes)
-colcon build --packages-select proy_andres_mundo turtlebot3_gazebo
+# 4.1  Conectar el PC a la red WiFi del laboratorio:
+#      TP-LINK_6CAE  (contraseña: 41422915)
+#      TP-LINK_6B36  (contraseña: 89776513)
+#      Comprobar que la IP del PC empieza por 192.168.0.XXX:
+ip addr   # o: ifconfig
 
-# 3. Refrescar los cambios recién compilados
+# 4.2  Conectar al robot por SSH (contraseña: turtlebot):
+ssh ubuntu@192.168.0.XX
+
+# 4.3  En el robot: configurar el dominio (solo si no está ya en ~/.bashrc):
+echo "export ROS_DOMAIN_ID=X" >> ~/.bashrc   # X = número de equipo
+source ~/.bashrc
+
+# 4.4  En el robot: lanzar el bringup (publica /scan, /odom, /imu, /tf, /cmd_vel…):
+ros2 launch turtlebot3_bringup robot.launch.py
+
+# 4.5  (Opcional) Cámara del robot — en el robot, terminal separado:
+ros2 run image_tools cam2image   # publica en /image
+
+# 4.6  Verificar desde el PC que se ven los tópicos del robot:
+ros2 topic list
+# Deben aparecer: /scan  /odom  /imu  /cmd_vel  /tf  /tf_static  /battery_state …
+
+# 4.7  Mover el robot para probar la comunicación:
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  '{linear: {x: 0.0}, angular: {z: 0.1}}'
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  '{linear: {x: 0.0}, angular: {z: 0.0}}'
+
+
+########################################################################
+## 5. COMPILACIÓN
+########################################################################
+
+# Compilación completa:
+colcon build
+
+# Compilación rápida (solo paquetes modificados):
+colcon build --packages-select \
+  proy_andres_mundo \
+  proy_andres_nav_ruta \
+  proy_andres_nav_punto \
+  proy_andres_captacion \
+  proy_andres_interface
+
+# Refrescar el entorno tras compilar:
 source install/setup.bash
 
-# 4. Lanzar la simulación (El argumento -r quita la pausa inicial)
-ros2 launch proy_andres_mundo warehouse.launch.py gz_args:="-r"
+# Limpiar procesos fantasma de Gazebo antes de recompilar:
+pkill -9 gz; pkill -9 ruby; pkill -9 gazebo
 
 
-### Terminal de control manual ###
+########################################################################
+## 6. SIMULACIÓN — COMANDOS INDIVIDUALES (sin usar start.sh)
+########################################################################
+
+# Lanzar Gazebo con el mundo del almacén:
+export LIBGL_ALWAYS_SOFTWARE=1
+ros2 launch proy_andres_mundo warehouse.launch.py use_sim_time:=true gz_args:="-r"
+
+# Control manual por teclado (W/A/S/D, Espacio=freno, Q=salir):
+ros2 run proy_andres_mundo control_manual
+
+# SLAM para generar un mapa nuevo:
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
+ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
+
+# Guardar el mapa generado:
+ros2 run nav2_map_server map_saver_cli -f mapa_warehouse
+# o con QoS transient_local:
+ros2 run nav2_map_server map_saver_cli -f mapa_warehouse \
+  --ros-args -p map_subscribe_transient_local:=true
+
+# Lanzar Nav2 (simulación):
+ros2 launch nav2_bringup bringup_launch.py \
+  use_sim_time:=true \
+  map:=/home/javier/Escritorio/GTI/ProyectoRobotica04/mapa_warehouse.yaml
+
+# Publicar pose inicial manualmente (simulación, pose 0,0,0):
+python3 scripts/publish_initialpose.py
+
+# Rosbridge (simulación):
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml use_sim_time:=true
+
+# Puentes Gazebo→ROS (solo simulación, el robot real NO los necesita):
+ros2 run ros_gz_bridge parameter_bridge \
+  /scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan \
+  --ros-args -p use_sim_time:=true
+ros2 run ros_gz_bridge parameter_bridge \
+  /imu@sensor_msgs/msg/Imu[gz.msgs.IMU \
+  --ros-args -p use_sim_time:=true
+
+# Comprimir imagen de la cámara para la web (simulación):
+ros2 run image_transport republish raw compressed \
+  --ros-args \
+  --remap in:=/camera/image_raw \
+  --remap out/compressed:=/camera/image_raw/compressed
+
+# Patrulla automática (nodo bridge web↔Nav2):
+ros2 run proy_andres_nav_ruta patrulla_bridge --ros-args -p use_sim_time:=true
+
+# Patrulla autónoma directa (sin web):
+ros2 run proy_andres_nav_ruta patrullar --ros-args -p use_sim_time:=true
+
+# Navegación a un punto concreto (sin web):
+ros2 run proy_andres_nav_punto ir_a_punto --ros-args -p use_sim_time:=true
+
+# Teleop web (servicio /movement → /cmd_vel):
+ros2 run proy_andres_nav_punto web_teleop --ros-args -p use_sim_time:=true
+
+# Procesador de imagen:
+ros2 run proy_andres_captacion procesador_imagen --ros-args -p use_sim_time:=true
+
+# RViz con Nav2:
+ros2 launch nav2_bringup rviz_launch.py use_sim_time:=true
+
+# Ajustar velocidad máxima de giro (evita giros bruscos en patrulla):
+ros2 param set /controller_server FollowPath.wz_max 0.25
 
 
-# Ejecutar el nodo de control manual
+########################################################################
+## 7. ROBOT REAL — COMANDOS INDIVIDUALES (sin usar start_real.sh)
+########################################################################
+
+# Nav2 con el mapa real:
+ros2 launch nav2_bringup bringup_launch.py \
+  use_sim_time:=false \
+  map:=/home/javier/Escritorio/GTI/ProyectoRobotica04/mapa_warehouse_real.yaml
+
+# Publicar pose inicial (robot real; x y yaw opcionales, defecto 0 0 0):
+python3 scripts/publish_initialpose.py 0.0 0.0 0.0 \
+  --ros-args -p use_sim_time:=false
+
+# Rosbridge (robot real):
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml use_sim_time:=false
+
+# Comprimir imagen de la cámara del robot real para la web:
+# (el robot publica en /image con image_tools/cam2image)
+ros2 run image_transport republish raw compressed \
+  --ros-args \
+  --remap in:=/image \
+  --remap out/compressed:=/camera/image_raw/compressed
+
+# Patrulla automática (robot real):
+ros2 run proy_andres_nav_ruta patrulla_bridge --ros-args -p use_sim_time:=false
+
+# Procesador de imagen (robot real, cámara en /image):
+ros2 run proy_andres_captacion procesador_imagen \
+  --ros-args -p use_sim_time:=false -p camera_topic:=/image
+
+# RViz (robot real):
+ros2 launch nav2_bringup rviz_launch.py use_sim_time:=false
+
+# Control manual por teclado (igual en sim y robot real):
 ros2 run proy_andres_mundo control_manual
 
 
-### Terminal de SLAM y RViz ###
+########################################################################
+## 8. DIAGNÓSTICO Y DEPURACIÓN
+########################################################################
+
+# Ver todos los nodos activos:
+ros2 node list
+
+# Ver todos los tópicos activos:
+ros2 topic list
+
+# Monitorizar la odometría:
+ros2 topic echo /odom
+
+# Monitorizar el láser:
+ros2 topic echo /scan
+
+# Ver el árbol de transformadas:
+ros2 run tf2_tools view_frames
+ros2 run rqt_tf_tree rqt_tf_tree
+
+# Ver el grafo de nodos y tópicos:
+rqt_graph
+
+# Comprobar que Nav2 está activo:
+ros2 service list | grep nav2
+
+# Comprobar que rosbridge está escuchando en el puerto 9090:
+ss -tlnp | grep 9090
+
+# Ver logs de un nodo concreto:
+ros2 run proy_andres_nav_ruta patrulla_bridge --ros-args --log-level debug
+
+# Limpiar logs de ROS:
+rm -rf ~/.ros/log/*
+
+# Liberar puertos si quedaron ocupados:
+fuser -k 9090/tcp   # rosbridge
+fuser -k 5173/tcp   # Vite
 
 
-# Lanzar el algoritmo SLAM de la caja de herramientas (usa el tiempo de simulación)
-ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
+########################################################################
+## 9. NOTAS IMPORTANTES
+########################################################################
 
-# En otra pestaña o en segundo plano, abrir RViz para visualizar el mapa y el láser
-ros2 run rviz2 rviz2 --ros-args -p use_sim_time:=true
+# ── ROS_DOMAIN_ID ───────────────────────────────────────────────────
+# • Simulación: 42 (definido en start.sh)
+# • Robot real:  X = número de equipo (debe ser IDÉNTICO en el robot y el PC)
+# • Si los nodos no se ven entre sí, lo primero que hay que comprobar es
+#   que ambos tienen el mismo ROS_DOMAIN_ID.
 
+# ── DESCUBRIMIENTO DE RED ────────────────────────────────────────────
+# • Simulación:  ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST  (solo el PC)
+# • Robot real:  ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET     (toda la WiFi)
+# • Sin SUBNET el PC no descubre los nodos del robot aunque estén en la
+#   misma red.
 
-### Terminal Extra ###
+# ── MODELO DEL ROBOT ─────────────────────────────────────────────────
+# • Simulación:  TURTLEBOT3_MODEL=waffle
+# • Robot real:  TURTLEBOT3_MODEL=burger
 
+# ── use_sim_time ─────────────────────────────────────────────────────
+# • Simulación:  use_sim_time:=true   (todos los nodos usan /clock de Gazebo)
+# • Robot real:  use_sim_time:=false  (todos los nodos usan el reloj del SO)
+# • Si un nodo usa sim_time=true con el robot real, sus timers no avanzan
+#   porque no hay /clock publicado → el nodo parece congelado.
 
-# Guardar el mapa (generará mapa_warehouse.yaml y mapa_warehouse.pgm en el directorio actual)
-ros2 run nav2_map_server map_saver_cli -f mapa_warehouse
+# ── PUENTES Gazebo↔ROS (ros_gz_bridge) ──────────────────────────────
+# • Solo necesarios en simulación para /scan e /imu.
+# • Con el robot real NO se usan: turtlebot3_bringup ya publica esos
+#   tópicos directamente en ROS 2.
 
-# O
+# ── CÁMARA ───────────────────────────────────────────────────────────
+# • Simulación:  tópico /camera/image_raw  (Gazebo)
+# • Robot real:  tópico /image  (ros2 run image_tools cam2image en el robot)
+# • La web siempre consume /camera/image_raw/compressed; el nodo
+#   image_transport republish hace la conversión en ambos casos.
+# • Para activar la cámara en el robot editar /boot/firmware/config.txt
+#   y añadir start_x=1, luego reiniciar.
 
-ros2 run nav2_map_server map_saver_cli \
-  -f mapa_warehouse \
-  --ros-args \
-  -p map_subscribe_transient_local:=true
+# ── MAPA REAL ────────────────────────────────────────────────────────
+# • mapa_warehouse_real.yaml referencia mapa_warehouse_real.pgm
+#   (resolución 0.015 m/px, origen [-1.966, -1.685, 0])
+# • Si el robot arranca en una posición distinta al origen del mapa,
+#   ajusta INITIAL_POSE en start_real.sh o pasa x y yaw a
+#   publish_initialpose.py para que AMCL converja más rápido.
 
-
-### Lanzar Nav2 ###
-
-
-# Usamos la ruta del archivo .yaml del mapa generado
-ros2 launch nav2_bringup bringup_launch.py use_sim_time:=true map:=/home/javier/Escritorio/GTI/ProyectoRobotica04/mapa_warehouse.yaml
-
-# Navegación automática: Modo patrulla
-ros2 run proy_andres_nav_ruta patrullar --ros-args -p use_sim_time:=true
-
-# Navegación automática: Modo coordenada
-ros2 run proy_andres_nav_punto ir_a_punto --ros-args -p use_sim_time:=true
+# ── COMPILAR EN WINDOWS ──────────────────────────────────────────────
+# • El desarrollo se hace en Windows (edición de ficheros) pero la
+#   compilación y ejecución se hacen en Linux con colcon.
+# • Tras hacer commit en Windows, en Linux:
+#     git pull
+#     colcon build
+#     source install/setup.bash

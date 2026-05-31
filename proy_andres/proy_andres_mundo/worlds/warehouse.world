@@ -76,6 +76,142 @@
       <uri>model://workcell_bin</uri>
       <pose>2 2 0 0 0 0</pose>
     </include>
+
+    <!-- ==================================================================
+         RECINTO: paredes perimetrales nuevas para cerrar el warehouse.
+         El edificio original (workcell) solo tiene pared oeste y sur, asi
+         que añadimos NORTE, ESTE (con hueco para puerta en y=4) y un relleno
+         en la esquina noroeste. Altura y grosor iguales a las paredes
+         originales (h=6.97771, grosor=0.72902, z_centro=3.48855).
+         ================================================================== -->
+    <model name="recinto">
+      <static>true</static>
+      <link name="link">
+
+        <!-- Pared NORTE (a lo largo de X, en y=+9.635) -->
+        <visual name="pared_norte_vis">
+          <pose>0.18 9.635 3.48855 0 0 0</pose>
+          <geometry><box><size>19.65 0.72902 6.97771</size></box></geometry>
+          <material>
+            <ambient>0.42 0.42 0.44 1</ambient>
+            <diffuse>0.68 0.68 0.70 1</diffuse>
+            <specular>0.10 0.10 0.10 1</specular>
+            <pbr><metal><metalness>0.0</metalness><roughness>0.95</roughness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="pared_norte_col">
+          <pose>0.18 9.635 3.48855 0 0 0</pose>
+          <geometry><box><size>19.65 0.72902 6.97771</size></box></geometry>
+        </collision>
+
+        <!-- Pared ESTE - tramo sur (de y=-10.02 a y=3.4) -->
+        <visual name="pared_este_sur_vis">
+          <pose>9.635 -3.31 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 13.42 6.97771</size></box></geometry>
+          <material>
+            <ambient>0.42 0.42 0.44 1</ambient>
+            <diffuse>0.68 0.68 0.70 1</diffuse>
+            <specular>0.10 0.10 0.10 1</specular>
+            <pbr><metal><metalness>0.0</metalness><roughness>0.95</roughness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="pared_este_sur_col">
+          <pose>9.635 -3.31 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 13.42 6.97771</size></box></geometry>
+        </collision>
+
+        <!-- Pared ESTE - tramo norte (de y=4.6 a y=9.99). Deja hueco de
+             puerta ~1.2 m centrado en y=4 (punto de patrulla P4). -->
+        <visual name="pared_este_norte_vis">
+          <pose>9.635 7.295 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 5.39 6.97771</size></box></geometry>
+          <material>
+            <ambient>0.42 0.42 0.44 1</ambient>
+            <diffuse>0.68 0.68 0.70 1</diffuse>
+            <specular>0.10 0.10 0.10 1</specular>
+            <pbr><metal><metalness>0.0</metalness><roughness>0.95</roughness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="pared_este_norte_col">
+          <pose>9.635 7.295 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 5.39 6.97771</size></box></geometry>
+        </collision>
+
+        <!-- Dintel sobre el hueco de la puerta ESTE: rellena desde el alto
+             de la puerta (~2.22 m) hasta el techo del muro (6.977 m). -->
+        <visual name="pared_este_dintel_vis">
+          <pose>9.635 4.0 4.599 0 0 0</pose>
+          <geometry><box><size>0.72902 1.20 4.757</size></box></geometry>
+          <material>
+            <ambient>0.42 0.42 0.44 1</ambient>
+            <diffuse>0.68 0.68 0.70 1</diffuse>
+            <specular>0.10 0.10 0.10 1</specular>
+            <pbr><metal><metalness>0.0</metalness><roughness>0.95</roughness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="pared_este_dintel_col">
+          <pose>9.635 4.0 4.599 0 0 0</pose>
+          <geometry><box><size>0.72902 1.20 4.757</size></box></geometry>
+        </collision>
+
+        <!-- Relleno esquina NOROESTE: la pared oeste original llega a
+             y=8.26; rellenamos hasta encontrar la pared norte. -->
+        <visual name="pared_oeste_relleno_vis">
+          <pose>-9.25721 9.12 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 1.73 6.97771</size></box></geometry>
+          <material>
+            <ambient>0.42 0.42 0.44 1</ambient>
+            <diffuse>0.68 0.68 0.70 1</diffuse>
+            <specular>0.10 0.10 0.10 1</specular>
+            <pbr><metal><metalness>0.0</metalness><roughness>0.95</roughness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="pared_oeste_relleno_col">
+          <pose>-9.25721 9.12 3.48855 0 0 0</pose>
+          <geometry><box><size>0.72902 1.73 6.97771</size></box></geometry>
+        </collision>
+
+      </link>
+    </model>
+
+    <!-- ==================================================================
+         PUERTAS junto a los puntos de control de patrulla.
+         P1(-7, 4)  -> pared OESTE  -> ABIERTA
+         P2(-7,-4)  -> pared OESTE  -> CERRADA
+         P3(0.5,-7) -> pared SUR    -> INTERMEDIA
+         P4(7, 4)   -> pared ESTE   -> ABIERTA (en el hueco real del muro)
+         ================================================================== -->
+
+    <!-- P1: puerta ABIERTA en pared oeste, junto a (-7, 4). La hoja abre
+         hacia el interior (+X). yaw=-90 deg. -->
+    <include>
+      <name>puerta_oeste_abierta</name>
+      <uri>model://puerta_abierta</uri>
+      <pose>-8.9 4.0 0 0 0 -1.5708</pose>
+    </include>
+
+    <!-- P2: puerta CERRADA en pared oeste, junto a (-7, -4). yaw=-90 deg. -->
+    <include>
+      <name>puerta_oeste_cerrada</name>
+      <uri>model://puerta_cerrada</uri>
+      <pose>-8.9 -4.0 0 0 0 -1.5708</pose>
+    </include>
+
+    <!-- P3: puerta INTERMEDIA en pared sur, junto a (0.5, -7). La hoja abre
+         hacia el interior (+Y). yaw=0. -->
+    <include>
+      <name>puerta_sur_intermedia</name>
+      <uri>model://puerta_intermedia</uri>
+      <pose>0.5 -9.6 0 0 0 0</pose>
+    </include>
+
+    <!-- P4: puerta ABIERTA en el hueco real de la pared este, junto a (7, 4).
+         La hoja abre hacia el interior (-X). yaw=+90 deg. -->
+    <include>
+      <name>puerta_este_abierta</name>
+      <uri>model://puerta_abierta</uri>
+      <pose>9.45 4.0 0 0 0 1.5708</pose>
+    </include>
     <actor name="caja_movil">
       <pose>2.0 2.0 0.5 0 0 0</pose>
       <link name="link">

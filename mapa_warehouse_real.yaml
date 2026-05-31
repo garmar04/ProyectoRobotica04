@@ -1,4 +1,4 @@
-image: mapa_warehouse.pgm
+image: mapa_warehouse_real.pgm
 mode: trinary
 resolution: 0.015
 origin: [-1.966, -1.685, 0]
