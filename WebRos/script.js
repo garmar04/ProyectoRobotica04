@@ -88,37 +88,188 @@ function setControlsEnabled(enabled) {
 }
 
 /* ── Alerts ─────────────────────────────────────────────── */
-let alertItemCount = 0;
+function insertOrUpdateAlert(newAlert) {
+  let alerts = [];
+  try {
+    const rawDb = localStorage.getItem('velaris_db_v1');
+    if (rawDb) {
+      alerts = JSON.parse(rawDb);
+    }
+  } catch (e) {
+    console.error("Error al cargar velaris_db_v1 de localStorage", e);
+  }
+
+  // Identificar duplicados basados en tipo_alerta y ubicación (orden, coord_x, coord_y) en estado "pendiente"
+  const duplicateIndex = alerts.findIndex(a => 
+    a.estado_alerta === 'pendiente' && 
+    a.tipo_alerta === newAlert.tipo_alerta &&
+    Number(a.orden) === Number(newAlert.orden) &&
+    Number(a.coord_x) === Number(newAlert.coord_x) &&
+    Number(a.coord_y) === Number(newAlert.coord_y)
+  );
+
+  if (duplicateIndex !== -1) {
+    // Si ya existe una idéntica pendiente, la reemplazamos con los datos más nuevos
+    alerts[duplicateIndex] = {
+      ...alerts[duplicateIndex],
+      id_alerta: newAlert.id_alerta || Date.now().toString(),
+      fecha_hora: newAlert.fecha_hora || new Date().toISOString(),
+      foto: newAlert.foto || null,
+      descripcion: newAlert.descripcion || ""
+    };
+  } else {
+    // Si no, añadimos la nueva alerta
+    alerts.push(newAlert);
+  }
+
+  try {
+    localStorage.setItem('velaris_db_v1', JSON.stringify(alerts));
+  } catch (e) {
+    console.error("Error al guardar velaris_db_v1 en localStorage", e);
+  }
+
+  renderAlerts();
+}
+
+function renderAlerts() {
+  let alerts = [];
+  try {
+    const rawDb = localStorage.getItem('velaris_db_v1');
+    if (rawDb) {
+      alerts = JSON.parse(rawDb);
+    }
+  } catch (e) {
+    console.error("Error al cargar velaris_db_v1", e);
+  }
+
+  // Filtrar solo las alertas pendientes
+  const pendingAlerts = alerts.filter(a => a.estado_alerta === 'pendiente');
+
+  // Ordenar por fecha_hora descendente (más recientes primero)
+  pendingAlerts.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+
+  if (!el.alertsList) return;
+  el.alertsList.innerHTML = '';
+
+  if (pendingAlerts.length === 0) {
+    el.alertsList.innerHTML =
+      '<div class="alerts-empty" id="alertsEmpty">' +
+      '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
+      '</svg><p>Sin alertas activas</p></div>';
+    safeSetText(el.alertsCount, 0);
+    return;
+  }
+
+  pendingAlerts.forEach(alert => {
+    const item = document.createElement('div');
+    item.className = 'alert-item';
+    
+    // Asignar clase crítica si corresponde
+    const isCritical = alert.severity === 'critical' || 
+                       /error|fallo|critical/i.test(alert.tipo_alerta) || 
+                       /error|fallo|critical/i.test(alert.descripcion);
+    if (isCritical) {
+      item.classList.add('critical');
+    }
+
+    let timeStr = "";
+    try {
+      timeStr = new Date(alert.fecha_hora).toLocaleTimeString('es-ES', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    } catch (e) {
+      timeStr = alert.fecha_hora || "";
+    }
+
+    // Si la descripción está vacía, mostramos el tipo de alerta o un marcador
+    const desc = alert.descripcion || alert.tipo_alerta;
+
+    item.innerHTML = `
+      <div class="alert-header">
+        <span class="alert-type">${alert.tipo_alerta}</span>
+        <span class="alert-time">${timeStr}</span>
+      </div>
+      <div class="alert-desc-container">
+        <p class="alert-desc" title="${desc}">${desc}</p>
+      </div>
+      ${alert.foto ? `
+      <div class="alert-image-container">
+        <img src="${alert.foto}" class="alert-image-thumb" alt="Captura de la alerta">
+      </div>` : ''}
+      <div class="alert-actions">
+        <button class="btn btn-small btn-resolve">
+          Marcar como resuelta
+        </button>
+      </div>
+    `;
+
+    // Vincular botón de resolución
+    const btn = item.querySelector('.btn-resolve');
+    btn.addEventListener('click', function() {
+      resolveAlert(alert.id_alerta);
+    });
+
+    el.alertsList.appendChild(item);
+  });
+
+  safeSetText(el.alertsCount, pendingAlerts.length);
+}
+
+function resolveAlert(id) {
+  let alerts = [];
+  try {
+    const rawDb = localStorage.getItem('velaris_db_v1');
+    if (rawDb) {
+      alerts = JSON.parse(rawDb);
+    }
+  } catch (e) {
+    console.error("Error al cargar velaris_db_v1", e);
+  }
+
+  // Actualizar estado de la alerta seleccionada
+  alerts = alerts.map(a => {
+    if (a.id_alerta.toString() === id.toString()) {
+      return { ...a, estado_alerta: 'resuelta' };
+    }
+    return a;
+  });
+
+  try {
+    localStorage.setItem('velaris_db_v1', JSON.stringify(alerts));
+  } catch (e) {
+    console.error("Error al guardar velaris_db_v1 en localStorage", e);
+  }
+
+  renderAlerts();
+}
 
 function addAlert(message, severity) {
   severity = severity || 'info';
+  
+  const alertData = {
+    id_alerta: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+    tipo_alerta: severity === 'critical' || /error|fallo/i.test(message) ? "Fallo Crítico" : "Notificación",
+    descripcion: message,
+    estado_alerta: "pendiente",
+    fecha_hora: new Date().toISOString(),
+    orden: 0,
+    coord_x: 0,
+    coord_y: 0,
+    foto: null
+  };
 
-  const emptyEl = document.getElementById('alertsEmpty');
-  if (emptyEl) emptyEl.style.display = 'none';
-
-  const item = document.createElement('div');
-  item.className = 'alert-item';
-  if (severity === 'critical' || /error|fallo/i.test(message)) {
-    item.classList.add('critical');
-  }
-
-  const timeStr = new Date().toLocaleTimeString('es-ES');
-  item.innerHTML = '<div class="alert-time">' + timeStr + '</div>' +
-    '<div class="alert-message">' + message + '</div>';
-
-  el.alertsList.insertBefore(item, el.alertsList.firstChild);
-  alertItemCount++;
-  safeSetText(el.alertsCount, alertItemCount);
+  insertOrUpdateAlert(alertData);
 }
 
 function clearAlerts() {
-  el.alertsList.innerHTML =
-    '<div class="alerts-empty" id="alertsEmpty">' +
-    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-    '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>' +
-    '</svg><p>Sin alertas activas</p></div>';
-  alertItemCount = 0;
-  safeSetText(el.alertsCount, 0);
+  // Limpiar localStorage poniendo un array vacío
+  try {
+    localStorage.setItem('velaris_db_v1', JSON.stringify([]));
+  } catch (e) {
+    console.error("Error al limpiar velaris_db_v1", e);
+  }
+  renderAlerts();
 }
 
 /* ── ROS Connection ─────────────────────────────────────── */
@@ -141,9 +292,31 @@ function connectToROS() {
       ros: ros, name: '/robot_alerts', messageType: 'std_msgs/msg/String'
     });
     alertsTopic.subscribe(function (msg) {
-      var text = msg.data || JSON.stringify(msg);
-      var sev = /critical/i.test(text) ? 'critical' : 'info';
-      addAlert(text, sev);
+      var text = msg.data || '';
+      var alertData = null;
+      try {
+        var trimmed = text.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          alertData = JSON.parse(trimmed);
+        }
+      } catch (e) {
+        console.warn("Fallo al parsear JSON de alerta, se tratará como texto plano:", e);
+      }
+
+      if (alertData && alertData.tipo_alerta) {
+        // Asegurar campos mínimos requeridos
+        if (!alertData.id_alerta) alertData.id_alerta = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+        if (!alertData.fecha_hora) alertData.fecha_hora = new Date().toISOString();
+        if (!alertData.estado_alerta) alertData.estado_alerta = "pendiente";
+        if (alertData.orden === undefined) alertData.orden = 0;
+        if (alertData.coord_x === undefined) alertData.coord_x = 0;
+        if (alertData.coord_y === undefined) alertData.coord_y = 0;
+        
+        insertOrUpdateAlert(alertData);
+      } else {
+        var sev = /critical/i.test(text) ? 'critical' : 'info';
+        addAlert(text, sev);
+      }
     });
 
     var canvasMap = document.getElementById("map");
@@ -569,3 +742,4 @@ el.modeToggle.addEventListener('change', function (e) {
 /* ── Init ───────────────────────────────────────────────── */
 setOperationMode('manual');
 setControlsEnabled(true);
+renderAlerts();
