@@ -8,17 +8,25 @@ echo "====================================================="
 # CONFIGURACIÓN DEL ROBOT REAL  (edita estos valores antes de lanzar)
 # =====================================================================
 # IP del robot dentro de la red TP-LINK (ver documento de IPs del grupo).
-ROBOT_IP="192.168.0.XX"
+ROBOT_IP="192.168.0.164"
 # Usuario SSH del TurtleBot.
 ROBOT_USER="ubuntu"
 # ROS_DOMAIN_ID: DEBE ser el mismo que tiene el robot en su ~/.bashrc
 # (en clase suele ser X = número de equipo). Aquí mantenemos 42 como en start.sh.
-ROBOT_DOMAIN_ID=42
+ROBOT_DOMAIN_ID=4
 # Tópico de la cámara del robot real (image_tools/cam2image publica en /image).
 CAMERA_TOPIC="/image"
 # Pose inicial del robot respecto al mapa real (x y yaw en rad). Ajusta donde
 # coloques físicamente el robot al arrancar; por defecto el origen del mapa.
 INITIAL_POSE="0.0 0.0 0.0"
+
+# --- CONFIGURACIÓN DEL ENTORNO EN EL ROBOT ---
+# Distribución de ROS 2 instalada en el robot (ej. "jazzy", "humble")
+ROBOT_ROS_DISTRO="jazzy"
+# Ruta al setup.bash de tu workspace en el robot (déjalo vacío si usas la instalación global de apt)
+# ROBOT_WORKSPACE_SETUP="~/turtlebot3_ws/install/setup.bash"
+ROBOT_WORKSPACE_SETUP="/home/ubuntu/turtlebot_ws/install/setup.bash"
+
 # Pon a "true" para lanzar el bringup del robot automáticamente por SSH.
 # Si lo dejas en "false" deberás ejecutar tú mismo, en un terminal:
 #     ssh ${ROBOT_USER}@${ROBOT_IP}
@@ -57,8 +65,16 @@ export TURTLEBOT3_MODEL=burger
 SSH_PID=""
 if [ "$LAUNCH_ROBOT_BRINGUP" = "true" ]; then
   echo "🔌 Lanzando bringup en el robot ($ROBOT_USER@$ROBOT_IP) por SSH..."
-  ssh -t ${ROBOT_USER}@${ROBOT_IP} \
-    "export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID}; export TURTLEBOT3_MODEL=burger; ros2 launch turtlebot3_bringup robot.launch.py" &
+  
+  # Construimos dinámicamente la carga de entorno remota para evitar fallos de 'command not found'
+  SSH_CMD="source /opt/ros/${ROBOT_ROS_DISTRO}/setup.bash"
+  if [ -n "$ROBOT_WORKSPACE_SETUP" ]; then
+    SSH_CMD="${SSH_CMD} && source ${ROBOT_WORKSPACE_SETUP}"
+  fi
+  SSH_CMD="${SSH_CMD} && export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID} && export TURTLEBOT3_MODEL=burger && ros2 launch turtlebot3_bringup robot.launch.py"
+  
+  # Quitamos la opción -t porque se ejecuta en segundo plano y causa conflicto con stdin
+  ssh ${ROBOT_USER}@${ROBOT_IP} "${SSH_CMD}" &
   SSH_PID=$!
 else
   echo "ℹ️  Recuerda lanzar en el ROBOT (por SSH):"

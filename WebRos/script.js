@@ -76,90 +76,6 @@ function formatDate(value) {
   catch { return value; }
 }
 
-function renderDatabasePanel() {
-  if (!window.VelarisDB) return;
-
-  const data = window.VelarisDB.getDataForCurrentUser();
-  const user = data.user;
-
-  if (!user) {
-    window.location.href = 'login.html';
-    return;
-  }
-
-  safeSetText(el.dbUserName, user.nombre || 'Usuario cliente');
-  safeSetText(el.dbUserEmail, user.email || '-');
-
-  if (el.robotSelect) {
-    const selected = window.VelarisDB.getSelectedRobot();
-    el.robotSelect.innerHTML = '';
-    data.robots.forEach(robot => {
-      const option = document.createElement('option');
-      option.value = robot.id_robot;
-      option.textContent = robot.nombre + ' · ' + robot.modelo;
-      if (selected && selected.id_robot === robot.id_robot) option.selected = true;
-      el.robotSelect.appendChild(option);
-    });
-  }
-
-  const robot = getActiveRobot();
-  if (robot) {
-    safeSetText(el.dbRobotState, robot.estado + ' · ' + robot.modo_operacion +
-      ' · x=' + Number(robot.ubicacion_actual_x || 0).toFixed(2) +
-      ', y=' + Number(robot.ubicacion_actual_y || 0).toFixed(2));
-  } else {
-    safeSetText(el.dbRobotState, 'Sin robots asociados');
-  }
-
-  safeSetText(el.statRobots, data.robots.length);
-  safeSetText(el.statAlertas, data.alertas.length);
-  safeSetText(el.statDetecciones, data.detecciones.length);
-  safeSetText(el.statPatrullas, data.patrullas.length);
-
-  if (el.dbAlertsBody) {
-    const pendientes = data.alertas.filter(a => a.estado_alerta === 'pendiente').sort((a, b) => b.id_alerta - a.id_alerta);
-    if (pendientes.length === 0) {
-      el.dbAlertsBody.innerHTML = '<tr><td colspan="6">Sin alertas pendientes</td></tr>';
-    } else {
-      el.dbAlertsBody.innerHTML = pendientes.map(a => (
-        '<tr>' +
-        '<td>#' + a.id_alerta + '</td>' +
-        '<td>' + (a.tipo_alerta || '-') + '</td>' +
-        '<td>' + (a.nivel || '-') + '</td>' +
-        '<td>' + (a.estado_alerta || '-') + '</td>' +
-        '<td>' + formatDate(a.fecha_hora) + '</td>' +
-        '<td><button class="btn btn-small" onclick="window.resolveAlert(' + a.id_alerta + ')">Resolver</button></td>' +
-        '</tr>'
-      )).join('');
-    }
-  }
-
-  const dbHistoryBody = document.getElementById('dbHistoryBody');
-  if (dbHistoryBody) {
-    const resueltas = data.alertas.filter(a => a.estado_alerta === 'resuelta').sort((a, b) => b.id_alerta - a.id_alerta);
-    if (resueltas.length === 0) {
-      dbHistoryBody.innerHTML = '<tr><td colspan="5">Sin historial de alertas</td></tr>';
-    } else {
-      dbHistoryBody.innerHTML = resueltas.map(a => (
-        '<tr>' +
-        '<td>#' + a.id_alerta + '</td>' +
-        '<td>' + (a.tipo_alerta || '-') + '</td>' +
-        '<td>' + (a.nivel || '-') + '</td>' +
-        '<td>' + (a.estado_alerta || '-') + '</td>' +
-        '<td>' + formatDate(a.fecha_hora) + '</td>' +
-        '</tr>'
-      )).join('');
-    }
-  }
-}
-
-window.resolveAlert = function (id_alerta) {
-  if (window.VelarisDB && window.VelarisDB.updateAlertState) {
-    window.VelarisDB.updateAlertState(id_alerta, 'resuelta');
-    renderDatabasePanel();
-  }
-};
-
 function persistAlertToDB(message, severity) {
   if (!window.VelarisDB) return;
   const robot = getActiveRobot();
@@ -222,65 +138,123 @@ function setControlsEnabled(enabled) {
 }
 
 /* ── Alerts ─────────────────────────────────────────────── */
-function insertOrUpdateAlert(newAlert) {
-  let alerts = [];
-  try {
-    const rawDb = localStorage.getItem('velaris_db_v1');
-    if (rawDb) {
-      alerts = JSON.parse(rawDb);
-    }
-  } catch (e) {
-    console.error("Error al cargar velaris_db_v1 de localStorage", e);
+function renderDatabasePanel() {
+  if (!window.VelarisDB) return;
+
+  const data = window.VelarisDB.getDataForCurrentUser();
+  const user = data.user;
+
+  if (!user) {
+    window.location.href = 'login.html';
+    return;
   }
 
-  // Identificar duplicados basados en tipo_alerta y ubicación (orden, coord_x, coord_y) en estado "pendiente"
-  const duplicateIndex = alerts.findIndex(a =>
-    a.estado_alerta === 'pendiente' &&
-    a.tipo_alerta === newAlert.tipo_alerta &&
-    Number(a.orden) === Number(newAlert.orden) &&
-    Number(a.coord_x) === Number(newAlert.coord_x) &&
-    Number(a.coord_y) === Number(newAlert.coord_y)
-  );
+  safeSetText(el.dbUserName, user.nombre || 'Usuario cliente');
+  safeSetText(el.dbUserEmail, user.email || '-');
 
-  if (duplicateIndex !== -1) {
-    // Si ya existe una idéntica pendiente, la reemplazamos con los datos más nuevos
-    alerts[duplicateIndex] = {
-      ...alerts[duplicateIndex],
-      id_alerta: newAlert.id_alerta || Date.now().toString(),
-      fecha_hora: newAlert.fecha_hora || new Date().toISOString(),
-      foto: newAlert.foto || null,
-      descripcion: newAlert.descripcion || ""
-    };
+  if (el.robotSelect) {
+    const selected = window.VelarisDB.getSelectedRobot();
+    el.robotSelect.innerHTML = '';
+    data.robots.forEach(robot => {
+      const option = document.createElement('option');
+      option.value = robot.id_robot;
+      option.textContent = robot.nombre + ' · ' + robot.modelo;
+      if (selected && selected.id_robot === robot.id_robot) option.selected = true;
+      el.robotSelect.appendChild(option);
+    });
+  }
+
+  const robot = getActiveRobot();
+  if (robot) {
+    safeSetText(el.dbRobotState, robot.estado + ' · ' + robot.modo_operacion +
+      ' · x=' + Number(robot.ubicacion_actual_x || 0).toFixed(2) +
+      ', y=' + Number(robot.ubicacion_actual_y || 0).toFixed(2));
   } else {
-    // Si no, añadimos la nueva alerta
-    alerts.push(newAlert);
+    safeSetText(el.dbRobotState, 'Sin robots asociados');
   }
 
-  try {
-    localStorage.setItem('velaris_db_v1', JSON.stringify(alerts));
-  } catch (e) {
-    console.error("Error al guardar velaris_db_v1 en localStorage", e);
+  safeSetText(el.statRobots, data.robots.length);
+  safeSetText(el.statAlertas, data.alertas.length);
+  safeSetText(el.statDetecciones, data.detecciones.length);
+  safeSetText(el.statPatrullas, data.patrullas.length);
+
+  if (el.dbAlertsBody) {
+    const pendientes = data.alertas.filter(a => a.estado_alerta === 'pendiente').sort((a, b) => b.id_alerta - a.id_alerta);
+    if (pendientes.length === 0) {
+      el.dbAlertsBody.innerHTML = '<tr><td colspan="6">Sin alertas pendientes</td></tr>';
+    } else {
+      el.dbAlertsBody.innerHTML = pendientes.map(a => (
+        '<tr>' +
+        '<td>#' + a.id_alerta + '</td>' +
+        '<td>' +
+          '<div class="alert-type-container">' +
+            '<span class="alert-type-name">' + (a.tipo_alerta || '-') + '</span>' +
+            '<span class="alert-type-desc" title="' + (a.descripcion || '') + '">' + (a.descripcion || '-') + '</span>' +
+          '</div>' +
+        '</td>' +
+        '<td>' + (a.nivel || '-') + '</td>' +
+        '<td>' + (a.estado_alerta || '-') + '</td>' +
+        '<td>' + formatDate(a.fecha_hora) + '</td>' +
+        '<td><button class="btn btn-small" onclick="window.resolveAlert(' + a.id_alerta + ')">Resolver</button></td>' +
+        '</tr>'
+      )).join('');
+    }
   }
 
+  const dbHistoryBody = document.getElementById('dbHistoryBody');
+  if (dbHistoryBody) {
+    const resueltas = data.alertas.filter(a => a.estado_alerta === 'resuelta').sort((a, b) => b.id_alerta - a.id_alerta);
+    if (resueltas.length === 0) {
+      dbHistoryBody.innerHTML = '<tr><td colspan="5">Sin historial de alertas</td></tr>';
+    } else {
+      dbHistoryBody.innerHTML = resueltas.map(a => (
+        '<tr>' +
+        '<td>#' + a.id_alerta + '</td>' +
+        '<td>' + (a.tipo_alerta || '-') + '</td>' +
+        '<td>' + (a.nivel || '-') + '</td>' +
+        '<td>' + (a.estado_alerta || '-') + '</td>' +
+        '<td>' + formatDate(a.fecha_hora) + '</td>' +
+        '</tr>'
+      )).join('');
+    }
+  }
+}
+
+window.resolveAlert = function (id_alerta) {
+  if (window.VelarisDB && window.VelarisDB.updateAlertState) {
+    window.VelarisDB.updateAlertState(Number(id_alerta), 'resuelta');
+    renderDatabasePanel();
+    renderAlerts();
+  }
+};
+
+function insertOrUpdateAlert(newAlert) {
+  if (!window.VelarisDB) return;
+  const robot = getActiveRobot();
+  if (!robot) return;
+
+  // Llama a createAlert que ahora implementa la lógica anti-acumulación
+  window.VelarisDB.createAlert({
+    id_robot: robot.id_robot,
+    id_deteccion: null,
+    tipo_alerta: newAlert.tipo_alerta,
+    descripcion: newAlert.descripcion || 'Alerta recibida de ROS2',
+    nivel: newAlert.nivel || 'media',
+    coord_x: Number(newAlert.coord_x || 0),
+    coord_y: Number(newAlert.coord_y || 0),
+    ruta_imagen: newAlert.foto || newAlert.ruta_imagen || null
+  });
+
+  renderDatabasePanel();
   renderAlerts();
 }
 
 function renderAlerts() {
-  let alerts = [];
-  try {
-    const rawDb = localStorage.getItem('velaris_db_v1');
-    if (rawDb) {
-      alerts = JSON.parse(rawDb);
-    }
-  } catch (e) {
-    console.error("Error al cargar velaris_db_v1", e);
-  }
+  if (!window.VelarisDB) return;
 
-  // Filtrar solo las alertas pendientes
-  const pendingAlerts = alerts.filter(a => a.estado_alerta === 'pendiente');
-
-  // Ordenar por fecha_hora descendente (más recientes primero)
-  pendingAlerts.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+  const data = window.VelarisDB.getDataForCurrentUser();
+  const pendingAlerts = data.alertas.filter(a => a.estado_alerta === 'pendiente');
+  pendingAlerts.sort((a, b) => b.id_alerta - a.id_alerta);
 
   if (!el.alertsList) return;
   el.alertsList.innerHTML = '';
@@ -299,8 +273,7 @@ function renderAlerts() {
     const item = document.createElement('div');
     item.className = 'alert-item';
 
-    // Asignar clase crítica si corresponde
-    const isCritical = alert.severity === 'critical' ||
+    const isCritical = alert.nivel === 'alta' || alert.nivel === 'Alta' ||
       /error|fallo|critical/i.test(alert.tipo_alerta) ||
       /error|fallo|critical/i.test(alert.descripcion);
     if (isCritical) {
@@ -316,7 +289,6 @@ function renderAlerts() {
       timeStr = alert.fecha_hora || "";
     }
 
-    // Si la descripción está vacía, mostramos el tipo de alerta o un marcador
     const desc = alert.descripcion || alert.tipo_alerta;
 
     item.innerHTML = `
@@ -327,9 +299,9 @@ function renderAlerts() {
       <div class="alert-desc-container">
         <p class="alert-desc" title="${desc}">${desc}</p>
       </div>
-      ${alert.foto ? `
+      ${alert.ruta_imagen ? `
       <div class="alert-image-container">
-        <img src="${alert.foto}" class="alert-image-thumb" alt="Captura de la alerta">
+        <img src="${alert.ruta_imagen}" class="alert-image-thumb" alt="Captura de la alerta">
       </div>` : ''}
       <div class="alert-actions">
         <button class="btn btn-small btn-resolve">
@@ -338,7 +310,6 @@ function renderAlerts() {
       </div>
     `;
 
-    // Vincular botón de resolución
     const btn = item.querySelector('.btn-resolve');
     btn.addEventListener('click', function () {
       resolveAlert(alert.id_alerta);
@@ -351,59 +322,43 @@ function renderAlerts() {
 }
 
 function resolveAlert(id) {
-  let alerts = [];
-  try {
-    const rawDb = localStorage.getItem('velaris_db_v1');
-    if (rawDb) {
-      alerts = JSON.parse(rawDb);
-    }
-  } catch (e) {
-    console.error("Error al cargar velaris_db_v1", e);
+  if (window.VelarisDB && window.VelarisDB.updateAlertState) {
+    window.VelarisDB.updateAlertState(Number(id), 'resuelta');
+    renderDatabasePanel();
+    renderAlerts();
   }
-
-  // Actualizar estado de la alerta seleccionada
-  alerts = alerts.map(a => {
-    if (a.id_alerta.toString() === id.toString()) {
-      return { ...a, estado_alerta: 'resuelta' };
-    }
-    return a;
-  });
-
-  try {
-    localStorage.setItem('velaris_db_v1', JSON.stringify(alerts));
-  } catch (e) {
-    console.error("Error al guardar velaris_db_v1 en localStorage", e);
-  }
-
-  renderAlerts();
 }
 
 function addAlert(message, severity) {
-  severity = severity || 'info';
+  if (!window.VelarisDB) return;
+  const robot = getActiveRobot();
+  if (!robot) return;
 
-  const alertData = {
-    id_alerta: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+  const pos = currentRobotPos || { x: 0, y: 0 };
+  const level = severity === 'critical' ? 'alta' : 'media';
+
+  window.VelarisDB.createAlert({
+    id_robot: robot.id_robot,
     tipo_alerta: severity === 'critical' || /error|fallo/i.test(message) ? "Fallo Crítico" : "Notificación",
     descripcion: message,
-    estado_alerta: "pendiente",
-    fecha_hora: new Date().toISOString(),
-    orden: 0,
-    coord_x: 0,
-    coord_y: 0,
-    foto: null
-  };
+    nivel: level,
+    coord_x: pos.x || 0,
+    coord_y: pos.y || 0,
+  });
 
-  insertOrUpdateAlert(alertData);
+  renderDatabasePanel();
+  renderAlerts();
 }
 
 function clearAlerts() {
-  // Limpiar localStorage poniendo un array vacío
-  try {
-    localStorage.setItem('velaris_db_v1', JSON.stringify([]));
-  } catch (e) {
-    console.error("Error al limpiar velaris_db_v1", e);
+  if (window.VelarisDB) {
+    const data = window.VelarisDB.getDataForCurrentUser();
+    data.alertas.forEach(a => {
+      window.VelarisDB.updateAlertState(a.id_alerta, 'resuelta');
+    });
+    renderDatabasePanel();
+    renderAlerts();
   }
-  renderAlerts();
 }
 
 /* ── ROS Connection ─────────────────────────────────────── */
@@ -470,7 +425,7 @@ function connectToROS() {
     var canvasMap = document.getElementById("map");
 
     // 1. Crear el Viewer primero para que el stage exista antes de añadir el marcador
-    if (!window.mapViewer) {
+    if (!window.mapViewer || !window.mapViewer.scene) {
       window.mapViewer = new ROS2D.Viewer({
         divID: 'mapViewer',
         width: 600,
@@ -609,7 +564,7 @@ function connectToROS() {
                 //    (esquina inferior-izquierda en ROS) en canvas (0,0) = esquina
                 //    superior-izquierda, por lo que el mapa queda invertido en Y.
                 draw_occupancy_grid(canvas, msg, null);
-                var ctx = canvas.getContext('2d');
+                var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
                 // 2. Voltear el ImageData verticalmente para corregir la orientacion.
                 //    Asi el norte del mapa queda arriba y las coordenadas ROS->canvas
@@ -707,10 +662,10 @@ function connectToROS() {
       cameraTopic.unsubscribe();
       cameraTopic2.unsubscribe();
 
-      // Mostrar la imagen procesada
+      // Mostrar la imagen procesada con el flash
       var imageBase64 = 'data:image/jpeg;base64,' + msg.data;
       img.src = imageBase64;
-      img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)'; // Efecto visual para el flash
+      img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)';
 
       if (flashTimeout) clearTimeout(flashTimeout);
       flashTimeout = setTimeout(function () {
@@ -719,20 +674,42 @@ function connectToROS() {
         cameraTopic2.subscribe(handleCameraMessage);
       }, 1000);
 
-      // --- GENERAR ALERTA DE IMAGEN (Punto de Control) ---
+      // --- GENERAR ALERTA DE IMAGEN (Asociación con punto de patrulla o puerta) ---
       if (window.VelarisDB) {
         const robot = getActiveRobot();
         if (robot) {
           const pos = currentRobotPos || { x: 0, y: 0 };
+          const data = window.VelarisDB.getDataForCurrentUser();
+          
+          let closestPoint = null;
+          let minDist = Infinity;
+          
+          // Buscar el punto de patrulla registrado en la BBDD más cercano al robot [5]
+          data.puntos_patrulla.forEach(p => {
+            const dist = Math.sqrt(Math.pow(p.coord_x - (pos.x || 0), 2) + Math.pow(p.coord_y - (pos.y || 0), 2));
+            if (dist < minDist) {
+              minDist = dist;
+              closestPoint = p;
+            }
+          });
+
+          // Definir descripción dinámica de acuerdo con el punto de control alcanzado [5]
+          let desc = 'Control rutinario completado en el punto de patrulla actual.';
+          if (closestPoint && minDist < 1.5) { // Tolerancia máxima de 1.5m para emparejar
+            const tipoPunto = closestPoint.es_puerta ? 'Puerta' : 'Punto de Control';
+            desc = `${tipoPunto} #${closestPoint.orden} (ID: ${closestPoint.id_punto}) analizado en control rutinario.`;
+          }
+
           window.VelarisDB.createAlert({
             id_robot: robot.id_robot,
             tipo_alerta: 'imagen',
-            descripcion: 'Control rutinario completado en el punto de patrulla actual.',
+            descripcion: desc,
             nivel: 'Baja', // Informativa
             coord_x: pos.x || 0,
             coord_y: pos.y || 0,
             ruta_imagen: imageBase64
           });
+          
           renderDatabasePanel();
         }
       }

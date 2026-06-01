@@ -905,3 +905,24 @@ footer {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+.alert-type-container {
+    display: flex;
+    flex-direction: column;
+    max-width: 260px;
+}
+
+.alert-type-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.alert-type-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+    margin-top: 2px;
+}

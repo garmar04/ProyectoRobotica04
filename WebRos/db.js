@@ -113,9 +113,10 @@
       db.patrullas.push(patrulla);
 
       db.puntos_patrulla.push(
-        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 1, coord_x: 0, coord_y: 0, coord_theta: 0, es_puerta: false },
-        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 2, coord_x: 2.2, coord_y: 0.5, coord_theta: 0, es_puerta: false },
-        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 3, coord_x: 2.2, coord_y: 2.1, coord_theta: 1.57, es_puerta: true }
+        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 1, coord_x: -7.0, coord_y: 4.0, coord_theta: 0, es_puerta: false },
+        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 2, coord_x: -7.0, coord_y: -4.0, coord_theta: 0, es_puerta: false },
+        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 3, coord_x: 0.5, coord_y: -7.0, coord_theta: 1.57, es_puerta: true }, // Puerta
+        { id_punto: nextId(db, 'punto'), id_patrulla: patrulla.id_patrulla, orden: 4, coord_x: 7.0, coord_y: 4.0, coord_theta: 0, es_puerta: false }
       );
 
       db.horarios.push({
@@ -303,22 +304,56 @@
 
   function createAlert({ id_robot, id_deteccion, tipo_alerta, descripcion, nivel, coord_x, coord_y, ruta_imagen }) {
     const db = init();
-    const alerta = {
-      id_alerta: nextId(db, 'alerta'),
-      id_robot: Number(id_robot),
-      id_deteccion: id_deteccion ? Number(id_deteccion) : null,
-      tipo_alerta: tipo_alerta || 'seguridad',
-      descripcion: descripcion || 'Alerta generada por el robot',
-      nivel: nivel || 'media',
-      fecha_hora: nowISO(),
-      coord_x: Number(coord_x || 0),
-      coord_y: Number(coord_y || 0),
-      ruta_imagen: ruta_imagen || null,
-      estado_alerta: 'pendiente',
-    };
-    db.alertas.push(alerta);
-    saveDB(db);
-    return alerta;
+    
+    const numRobot = Number(id_robot);
+    const cx = Number(coord_x || 0);
+    const cy = Number(coord_y || 0);
+    const type = tipo_alerta || 'seguridad';
+
+    const duplicateIndex = db.alertas.findIndex(a => {
+      if (a.estado_alerta !== 'pendiente' || a.id_robot !== numRobot || a.tipo_alerta !== type) {
+        return false;
+      }
+      const distance = Math.sqrt(Math.pow(a.coord_x - cx, 2) + Math.pow(a.coord_y - cy, 2));
+      return distance < 0.2;
+    });
+
+    if (duplicateIndex !== -1) {
+      const oldAlert = db.alertas[duplicateIndex];
+      const newId = nextId(db, 'alerta');
+      
+      db.alertas[duplicateIndex] = {
+        ...oldAlert,
+        id_alerta: newId,
+        id_deteccion: id_deteccion ? Number(id_deteccion) : oldAlert.id_deteccion,
+        descripcion: descripcion || oldAlert.descripcion,
+        nivel: nivel || oldAlert.nivel,
+        fecha_hora: nowISO(),
+        coord_x: cx,
+        coord_y: cy,
+        ruta_imagen: ruta_imagen || oldAlert.ruta_imagen
+      };
+      
+      saveDB(db);
+      return db.alertas[duplicateIndex];
+    } else {
+      const alerta = {
+        id_alerta: nextId(db, 'alerta'),
+        id_robot: numRobot,
+        id_deteccion: id_deteccion ? Number(id_deteccion) : null,
+        tipo_alerta: type,
+        descripcion: descripcion || 'Alerta generada por el robot',
+        nivel: nivel || 'media',
+        fecha_hora: nowISO(),
+        coord_x: cx,
+        coord_y: cy,
+        ruta_imagen: ruta_imagen || null,
+        estado_alerta: 'pendiente',
+      };
+      db.alertas.push(alerta);
+      saveDB(db);
+      return alerta;
+    }
   }
 
   function getDataForCurrentUser() {

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Modo patrulla: recorre una ruta predefinida usando `followWaypoints`.
+"""Modo patrulla: recorre una ruta predefinida indefinidamente usando `goToPose`.
 
-Define cuatro puntos de paso por el almacén y los envía a Nav2 mediante el
-`BasicNavigator`, mostrando por consola el progreso entre waypoints.
+Define cuatro puntos de paso por el almacén y los envía en bucle continuo a Nav2
+mediante el `BasicNavigator`, mostrando por consola el progreso entre waypoints.
 
 Uso:
     ros2 run proy_andres_nav_ruta patrullar
@@ -12,6 +12,7 @@ import rclpy
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import Trigger
+import time
 
 
 def llamar_servicio_procesamiento(node):
@@ -34,26 +35,16 @@ def llamar_servicio_procesamiento(node):
 
 
 # Ruta de patrulla: lista de puntos (x, y) en el frame `map`.
-# Modificar aquí para cambiar el recorrido sin tocar la lógica de navegación.
 PATROL_WAYPOINTS = [
     (-7.0,  4.0),  # Punto 1: Pasillo A
     (-7.0, -4.0),  # Punto 2: Esquina estanterías
-    ( 0.5, -7.0),  # Punto 3: Pasillo B
+    ( 0.5, -7.0),  # Punto 3: Pasillo B (Puerta de control)
     ( 7.0,  4.0),  # Punto 4: Vuelta al inicio
 ]
 
 
 def create_pose(x: float, y: float, w: float = 1.0) -> PoseStamped:
-    """Construye un `PoseStamped` en el frame `map` con la pose indicada.
-
-    Args:
-        x: Coordenada X en metros.
-        y: Coordenada Y en metros.
-        w: Componente w del cuaternión de orientación (1.0 = sin rotación).
-
-    Returns:
-        Mensaje `PoseStamped` listo para añadir a la lista de waypoints.
-    """
+    """Construye un `PoseStamped` en el frame `map` con la pose indicada."""
     pose = PoseStamped()
     pose.header.frame_id = 'map'
     pose.pose.position.x = float(x)
@@ -62,36 +53,33 @@ def create_pose(x: float, y: float, w: float = 1.0) -> PoseStamped:
     return pose
 
 def main(args=None):
-    """Inicializa Nav2, recorre los puntos uno a uno y procesa la imagen en cada parada."""
+    """Inicializa Nav2, recorre los puntos en bucle continuo y procesa imagen en cada parada."""
     rclpy.init(args=args)
     navigator = None
     try:
         navigator = BasicNavigator()
         navigator.waitUntilNav2Active()
 
-        print("=== VERSIÓN CON PROCESAMIENTO DE IMAGEN ACTIVA ===")
-        print("Iniciando modo patrulla secuencial...")
+        print("=== VERSIÓN CON PROCESAMIENTO DE IMAGEN EN BUCLE ACTIVA ===")
+        print("Iniciando modo patrulla infinita continua...")
 
-        for i, (x, y) in enumerate(PATROL_WAYPOINTS):
-            print(f"Navegando al waypoint {i}: ({x}, {y})...")
-            pose = create_pose(x, y)
-            navigator.goToPose(pose)
+        while rclpy.ok():
+            for i, (x, y) in enumerate(PATROL_WAYPOINTS):
+                print(f"Navegando al waypoint {i}: ({x}, {y})...")
+                pose = create_pose(x, y)
+                navigator.goToPose(pose)
 
-            while not navigator.isTaskComplete():
-                # Opcional: imprimir feedback de distancia
-                pass
+                while not navigator.isTaskComplete():
+                    time.sleep(0.1)
 
-            result = navigator.getResult()
-            if result == TaskResult.SUCCEEDED:
-                print(f"¡Llegada al waypoint {i}! Procesando imagen...")
-                llamar_servicio_procesamiento(navigator)
-            else:
-                print(f"No se pudo llegar al waypoint {i}. Saltando...")
-
-        print('¡Ruta de patrulla completada!')
+                result = navigator.getResult()
+                if result == TaskResult.SUCCEEDED:
+                    print(f"¡Llegada al waypoint {i}! Procesando imagen...")
+                    llamar_servicio_procesamiento(navigator)
+                else:
+                    print(f"No se pudo llegar al waypoint {i}. Saltando al siguiente...")
 
     except KeyboardInterrupt:
-...
         print('\nInterrupción del usuario: cancelando patrulla...')
         if navigator is not None:
             try:
