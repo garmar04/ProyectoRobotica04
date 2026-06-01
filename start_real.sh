@@ -18,21 +18,23 @@ ROBOT_DOMAIN_ID=4
 CAMERA_TOPIC="/image"
 # Pose inicial del robot respecto al mapa real (x y yaw en rad). Ajusta donde
 # coloques físicamente el robot al arrancar; por defecto el origen del mapa.
-INITIAL_POSE="0.0 0.0 0.0"
+# NOTA: En mapa_warehouse_real, el origen 0,0 está FUERA del mapa. 
+# Prueba con "-1.0 -0.5 0.0" para caer dentro de la zona navegable.
+INITIAL_POSE="-1.0 -0.5 0.0"
 
 # --- CONFIGURACIÓN DEL ENTORNO EN EL ROBOT ---
 # Distribución de ROS 2 instalada en el robot (ej. "jazzy", "humble")
 ROBOT_ROS_DISTRO="jazzy"
 # Ruta al setup.bash de tu workspace en el robot (déjalo vacío si usas la instalación global de apt)
 # ROBOT_WORKSPACE_SETUP="~/turtlebot3_ws/install/setup.bash"
-ROBOT_WORKSPACE_SETUP="/home/ubuntu/turtlebot_ws/install/setup.bash"
+ROBOT_WORKSPACE_SETUP="~/turtlebot3_ws/install/setup.bash"
 
 # Pon a "true" para lanzar el bringup del robot automáticamente por SSH.
 # Si lo dejas en "false" deberás ejecutar tú mismo, en un terminal:
 #     ssh ${ROBOT_USER}@${ROBOT_IP}
 #     export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID}
 #     ros2 launch turtlebot3_bringup robot.launch.py
-LAUNCH_ROBOT_BRINGUP=false
+LAUNCH_ROBOT_BRINGUP=true
 
 # 1. LIMPIEZA TOTAL (procesos del PC, NO del robot)
 echo "🧹 Limpiando procesos anteriores..."
@@ -44,6 +46,11 @@ fuser -k 5173/tcp 2>/dev/null || true
 ros2 daemon stop 2>/dev/null || true
 rm -rf ~/.ros/log/* 2>/dev/null || true
 sleep 2
+
+# (OPCIONAL) Sincronizar reloj con el robot para evitar errores de TF (AMCL)
+# Si ves errores de 'timestamp earlier than data in transform cache', ejecuta:
+# sudo date -s "$(ssh ${ROBOT_USER}@${ROBOT_IP} 'date -u')"
+# o usa ntp/chrony.
 
 # 2. ENTORNO
 WORKSPACE_DIR="/home/javier/Escritorio/GTI/ProyectoRobotica04"
@@ -60,6 +67,7 @@ export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
 export ROS_LOCALHOST_ONLY=0
 # El robot físico del laboratorio es un TurtleBot3 burger.
 export TURTLEBOT3_MODEL=burger
+export LDS_MODEL=LDS-01
 
 # 3. (OPCIONAL) ARRANCAR EL BRINGUP DEL ROBOT POR SSH
 SSH_PID=""
@@ -71,7 +79,7 @@ if [ "$LAUNCH_ROBOT_BRINGUP" = "true" ]; then
   if [ -n "$ROBOT_WORKSPACE_SETUP" ]; then
     SSH_CMD="${SSH_CMD} && source ${ROBOT_WORKSPACE_SETUP}"
   fi
-  SSH_CMD="${SSH_CMD} && export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID} && export TURTLEBOT3_MODEL=burger && ros2 launch turtlebot3_bringup robot.launch.py"
+  SSH_CMD="${SSH_CMD} && export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID} && export TURTLEBOT3_MODEL=burger && export LDS_MODEL=LDS-01 && ros2 launch turtlebot3_bringup robot.launch.py"
   
   # Quitamos la opción -t porque se ejecuta en segundo plano y causa conflicto con stdin
   ssh ${ROBOT_USER}@${ROBOT_IP} "${SSH_CMD}" &
@@ -128,10 +136,9 @@ sleep 3
 echo "[5/7] 📡 Cámara del robot real -> web..."
 # NOTA: la /scan e /imu las publica directamente el robot (turtlebot3_bringup),
 # por eso aquí NO usamos ros_gz_bridge (eso era exclusivo de Gazebo).
-# Comprimimos la imagen de la cámara del robot ($CAMERA_TOPIC) al tópico que
-# espera la web (/camera/image_raw/compressed).
-# Requiere que en el robot esté corriendo la cámara, p.ej.:
-#     ros2 run image_tools cam2image   (publica en /image)
+# Requiere que en el robot esté corriendo la cámara en un terminal aparte:
+#     ssh ubuntu@$ROBOT_IP
+#     ros2 run image_tools cam2image --ros-args -p width:=320 -p height:=240
 ros2 run image_transport republish raw compressed \
   --ros-args \
   --remap in:=$CAMERA_TOPIC \

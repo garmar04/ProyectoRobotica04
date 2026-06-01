@@ -241,7 +241,15 @@ ros2 param set /controller_server FollowPath.wz_max 0.25
 
 ########################################################################
 ## 7. ROBOT REAL — COMANDOS INDIVIDUALES (sin usar start_real.sh)
+
 ########################################################################
+
+# Sincroizar Relojes
+sudo date -s "$(ssh ubuntu@192.168.0.164 'date -u')"
+
+# Iniciar cámara en otra terminal
+ssh ubuntu@192.168.0.164
+ros2 run image_tools cam2image --ros-args -p width:=320 -p height:=240
 
 # Nav2 con el mapa real:
 ros2 launch nav2_bringup bringup_launch.py \
