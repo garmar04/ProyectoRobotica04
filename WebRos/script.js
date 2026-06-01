@@ -76,6 +76,20 @@ function formatDate(value) {
   catch { return value; }
 }
 
+function formatDescription(desc) {
+  if (!desc) return '-';
+  const isDoorOpen = desc.includes(' - Abierta');
+  const isDoorClosed = desc.includes(' - Cerrada');
+
+  if (isDoorOpen) {
+    return desc.replace(' - Abierta', ' - <strong style="color: var(--danger-color); font-weight: 700; text-transform: uppercase;">Abierta</strong>');
+  }
+  if (isDoorClosed) {
+    return desc.replace(' - Cerrada', ' - <strong style="color: var(--success-color); font-weight: 700; text-transform: uppercase;">Cerrada</strong>');
+  }
+  return desc;
+}
+
 function persistAlertToDB(message, severity) {
   if (!window.VelarisDB) return;
   const robot = getActiveRobot();
@@ -178,44 +192,44 @@ function renderDatabasePanel() {
   safeSetText(el.statDetecciones, data.detecciones.length);
   safeSetText(el.statPatrullas, data.patrullas.length);
 
+  // Renderizar la tabla de últimas alertas guardadas (pendientes)
   if (el.dbAlertsBody) {
     const pendientes = data.alertas.filter(a => a.estado_alerta === 'pendiente').sort((a, b) => b.id_alerta - a.id_alerta);
     if (pendientes.length === 0) {
-      el.dbAlertsBody.innerHTML = '<tr><td colspan="6">Sin alertas pendientes</td></tr>';
+      el.dbAlertsBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Sin alertas pendientes</td></tr>';
     } else {
-      el.dbAlertsBody.innerHTML = pendientes.map(a => (
-        '<tr>' +
-        '<td>#' + a.id_alerta + '</td>' +
-        '<td>' +
-          '<div class="alert-type-container">' +
-            '<span class="alert-type-name">' + (a.tipo_alerta || '-') + '</span>' +
-            '<span class="alert-type-desc" title="' + (a.descripcion || '') + '">' + (a.descripcion || '-') + '</span>' +
-          '</div>' +
-        '</td>' +
-        '<td>' + (a.nivel || '-') + '</td>' +
-        '<td>' + (a.estado_alerta || '-') + '</td>' +
-        '<td>' + formatDate(a.fecha_hora) + '</td>' +
-        '<td><button class="btn btn-small" onclick="window.resolveAlert(' + a.id_alerta + ')">Resolver</button></td>' +
-        '</tr>'
-      )).join('');
-    }
-  }
+      el.dbAlertsBody.innerHTML = pendientes.map(a => {
+        const nivelLower = (a.nivel || '').toLowerCase();
+        let nivelBadgeStyle = 'color: var(--text-secondary); background: rgba(255, 255, 255, 0.05);';
 
-  const dbHistoryBody = document.getElementById('dbHistoryBody');
-  if (dbHistoryBody) {
-    const resueltas = data.alertas.filter(a => a.estado_alerta === 'resuelta').sort((a, b) => b.id_alerta - a.id_alerta);
-    if (resueltas.length === 0) {
-      dbHistoryBody.innerHTML = '<tr><td colspan="5">Sin historial de alertas</td></tr>';
-    } else {
-      dbHistoryBody.innerHTML = resueltas.map(a => (
-        '<tr>' +
-        '<td>#' + a.id_alerta + '</td>' +
-        '<td>' + (a.tipo_alerta || '-') + '</td>' +
-        '<td>' + (a.nivel || '-') + '</td>' +
-        '<td>' + (a.estado_alerta || '-') + '</td>' +
-        '<td>' + formatDate(a.fecha_hora) + '</td>' +
-        '</tr>'
-      )).join('');
+        if (nivelLower === 'alta') {
+          nivelBadgeStyle = 'color: var(--danger-color); background: rgba(239, 68, 68, 0.15); font-weight: bold;';
+        } else if (nivelLower === 'baja') {
+          nivelBadgeStyle = 'color: var(--secondary-color); background: rgba(100, 116, 139, 0.15);';
+        } else if (nivelLower === 'media') {
+          nivelBadgeStyle = 'color: var(--warning-color); background: rgba(245, 158, 11, 0.15); font-weight: bold;';
+        }
+
+        return (
+          '<tr>' +
+          '<td>#' + a.id_alerta + '</td>' +
+          '<td>' +
+          '<div class="alert-type-container" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
+          '<span class="alert-type-name" style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">' + (a.tipo_alerta || '-') + '</span>' +
+          '<span class="alert-type-desc" style="font-size: 14px; margin-top: 2px; display: block; font-weight: 500;">' + formatDescription(a.descripcion) + '</span>' +
+          '</div>' +
+          '</td>' +
+          '<td>' +
+          '<span style="padding: 4px 8px; border-radius: 6px; font-size: 11px; text-transform: uppercase; ' + nivelBadgeStyle + '">' +
+          (a.nivel || '-') +
+          '</span>' +
+          '</td>' +
+          '<td><span style="font-size: 12px; color: var(--text-secondary);">' + (a.estado_alerta || '-') + '</span></td>' +
+          '<td>' + formatDate(a.fecha_hora) + '</td>' +
+          '<td><button class="btn btn-small" style="padding: 4px 8px; font-size: 11px;" onclick="window.resolveAlert(' + a.id_alerta + ')">Resolver</button></td>' +
+          '</tr>'
+        );
+      }).join('');
     }
   }
 }
@@ -275,7 +289,8 @@ function renderAlerts() {
 
     const isCritical = alert.nivel === 'alta' || alert.nivel === 'Alta' ||
       /error|fallo|critical/i.test(alert.tipo_alerta) ||
-      /error|fallo|critical/i.test(alert.descripcion);
+      alert.descripcion.includes(' - Abierta'); // Considerar crítico si la puerta se detecta abierta
+
     if (isCritical) {
       item.classList.add('critical');
     }
@@ -293,18 +308,20 @@ function renderAlerts() {
 
     item.innerHTML = `
       <div class="alert-header">
-        <span class="alert-type">${alert.tipo_alerta}</span>
+        <span class="alert-type" style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">${alert.tipo_alerta}</span>
         <span class="alert-time">${timeStr}</span>
       </div>
-      <div class="alert-desc-container">
-        <p class="alert-desc" title="${desc}">${desc}</p>
+      <div class="alert-desc-container" style="margin-top: 4px;">
+        <p class="alert-desc" style="font-size: 15px; font-weight: 600; white-space: normal; overflow: visible;">
+          ${formatDescription(desc)}
+        </p>
       </div>
       ${alert.ruta_imagen ? `
-      <div class="alert-image-container">
+      <div class="alert-image-container" style="margin-top: 8px; border-radius: 6px;">
         <img src="${alert.ruta_imagen}" class="alert-image-thumb" alt="Captura de la alerta">
       </div>` : ''}
-      <div class="alert-actions">
-        <button class="btn btn-small btn-resolve">
+      <div class="alert-actions" style="margin-top: 8px;">
+        <button class="btn btn-small btn-resolve" style="padding: 4px 8px; font-size: 11px;">
           Marcar como resuelta
         </button>
       </div>
@@ -653,16 +670,19 @@ function connectToROS() {
       messageType: 'sensor_msgs/msg/CompressedImage'
     });
 
+    // Variable de control para el temporizador del stream de vídeo
     let flashTimeout = null;
+
+    // Suscripción al tópico de imágenes procesadas por visión artificial (OpenCV)
     processedTopic.subscribe(function (msg) {
       var img = document.getElementById('cameraStream');
       if (!img) return;
 
-      // Bloquear temporalmente el stream normal
+      // Bloquear temporalmente el stream normal para mostrar la captura procesada
       cameraTopic.unsubscribe();
       cameraTopic2.unsubscribe();
 
-      // Mostrar la imagen procesada con el flash
+      // Mostrar la imagen procesada aplicando un efecto visual (flash) temporal
       var imageBase64 = 'data:image/jpeg;base64,' + msg.data;
       img.src = imageBase64;
       img.style.filter = 'sepia(1) hue-rotate(90deg) brightness(1.2)';
@@ -674,17 +694,17 @@ function connectToROS() {
         cameraTopic2.subscribe(handleCameraMessage);
       }, 1000);
 
-      // --- GENERAR ALERTA DE IMAGEN (Asociación con punto de patrulla o puerta) ---
+      // --- PROCESAMIENTO DE ALERTA DE IMAGEN Y DETECCIÓN DE PUERTAS ---
       if (window.VelarisDB) {
         const robot = getActiveRobot();
         if (robot) {
           const pos = currentRobotPos || { x: 0, y: 0 };
           const data = window.VelarisDB.getDataForCurrentUser();
-          
+
           let closestPoint = null;
           let minDist = Infinity;
-          
-          // Buscar el punto de patrulla registrado en la BBDD más cercano al robot [5]
+
+          // Buscar el punto de patrulla en la base de datos más cercano a la coordenada actual del robot
           data.puntos_patrulla.forEach(p => {
             const dist = Math.sqrt(Math.pow(p.coord_x - (pos.x || 0), 2) + Math.pow(p.coord_y - (pos.y || 0), 2));
             if (dist < minDist) {
@@ -693,23 +713,34 @@ function connectToROS() {
             }
           });
 
-          // Definir descripción dinámica de acuerdo con el punto de control alcanzado [5]
-          let desc = 'Control rutinario completado en el punto de patrulla actual.';
-          if (closestPoint && minDist < 1.5) { // Tolerancia máxima de 1.5m para emparejar
-            const tipoPunto = closestPoint.es_puerta ? 'Puerta' : 'Punto de Control';
-            desc = `${tipoPunto} #${closestPoint.orden} (ID: ${closestPoint.id_punto}) analizado en control rutinario.`;
+          // Valores por defecto en caso de no asociar un punto de control
+          let desc = 'Control de puerta';
+          let nivelAlerta = 'baja';
+          let ordenPunto = closestPoint ? closestPoint.orden : '?';
+
+          // 1. Clasificación del estado de la puerta (Simulado para pruebas de visión artificial)
+          // En producción real, este valor provendría de la carga útil del mensaje o de un clasificador local
+          const estaAbierta = Math.random() > 0.5;
+          const estadoTexto = estaAbierta ? 'Abierta' : 'Cerrada';
+
+          // 2. Definición del identificador y nivel de importancia condicional
+          if (closestPoint) {
+            desc = `Puerta ${ordenPunto} - ${estadoTexto}`;
+            nivelAlerta = estaAbierta ? 'alta' : 'baja';
           }
 
+          // 3. Persistencia en base de datos local (con deduplicación basada en proximidad integrada en db.js)
           window.VelarisDB.createAlert({
             id_robot: robot.id_robot,
             tipo_alerta: 'imagen',
             descripcion: desc,
-            nivel: 'Baja', // Informativa
+            nivel: nivelAlerta,
             coord_x: pos.x || 0,
             coord_y: pos.y || 0,
             ruta_imagen: imageBase64
           });
-          
+
+          // Actualizar los elementos visuales del dashboard
           renderDatabasePanel();
         }
       }
